@@ -4,6 +4,7 @@ import { collectClaudeCode } from './collectors/claude-code.js'
 import { collectCursor } from './collectors/cursor.js'
 import { collectVSCodeCopilot } from './collectors/vscode-copilot.js'
 import { sendMetrics } from './sender.js'
+import { serviceInstall, serviceUninstall, serviceStatus } from './service.js'
 import type { CollectorResult } from './types.js'
 
 const collectors: Record<string, () => CollectorResult> = {
@@ -65,6 +66,17 @@ function runCollectors(enabled: string[]): CollectorResult[] {
   return results
 }
 
+async function runOnce() {
+  const config = loadConfig()
+  console.log(`[${new Date().toLocaleString()}] Ejecutando recolección...`)
+  const results = runCollectors(config.enabledCollectors)
+  console.log(`  ${results.length} resultados recolectados`)
+
+  if (results.length > 0) {
+    await sendMetrics(config.serverUrl, config.authToken, results)
+  }
+}
+
 async function run() {
   const config = loadConfig()
   console.log('Monitor IA Agent iniciado')
@@ -89,6 +101,19 @@ async function run() {
   const intervalMs = config.syncIntervalHours * 60 * 60 * 1000
   setInterval(cycle, intervalMs)
   console.log(`\nPróxima ejecución en ${config.syncIntervalHours}h. Ctrl+C para detener.`)
+}
+
+function configInterval(hours: number) {
+  if (hours < 1 || hours > 24) {
+    console.error('El intervalo debe estar entre 1 y 24 horas.')
+    process.exit(1)
+  }
+  const config = loadConfig()
+  config.syncIntervalHours = hours
+  saveConfig(config)
+  console.log(`Intervalo actualizado a ${hours}h`)
+  console.log('Si tienes el servicio instalado, reinstálalo para aplicar el cambio:')
+  console.log('  npx tsx src/index.ts service install')
 }
 
 function status() {
@@ -129,13 +154,43 @@ switch (command) {
   case 'run':
     run()
     break
+  case 'run-once':
+    runOnce()
+    break
   case 'status':
     status()
+    break
+  case 'service':
+    switch (args[1]) {
+      case 'install':
+        serviceInstall()
+        break
+      case 'uninstall':
+        serviceUninstall()
+        break
+      case 'status':
+        serviceStatus()
+        break
+      default:
+        console.log('Uso: monitor-ia-agent service <install|uninstall|status>')
+    }
+    break
+  case 'config':
+    if (args[1] === 'interval' && args[2]) {
+      configInterval(parseInt(args[2], 10))
+    } else {
+      console.log('Uso: monitor-ia-agent config interval <horas>')
+    }
     break
   default:
     console.log('Monitor IA Agent')
     console.log('\nComandos:')
     console.log('  setup <token> [serverUrl]  - Configurar el agente')
-    console.log('  run                        - Iniciar recolección')
+    console.log('  run                        - Iniciar recolección continua')
+    console.log('  run-once                   - Ejecutar una sola recolección')
     console.log('  status                     - Ver estado actual')
+    console.log('  service install            - Instalar como servicio del sistema')
+    console.log('  service uninstall          - Desinstalar servicio')
+    console.log('  service status             - Ver estado del servicio')
+    console.log('  config interval <horas>    - Cambiar intervalo de recolección')
 }
