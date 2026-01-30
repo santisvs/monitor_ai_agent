@@ -1,0 +1,20 @@
+{
+  "name": "monitor-ia-agent",
+  "version": "1.0.0",
+  "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
+  "type": "module",
+  "bin": {
+    "monitor-ia-agent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  }
+}
