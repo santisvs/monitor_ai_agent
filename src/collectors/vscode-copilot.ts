@@ -1,16 +1,16 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import type { CollectorResult } from '../types.js'
+import type { CollectorResult, ExtendedMetrics } from '../types.js'
 
 export function collectVSCodeCopilot(): CollectorResult {
   const extensionsDir = path.join(os.homedir(), '.vscode', 'extensions')
 
-  const metrics: CollectorResult['metrics'] = {
+  const metrics: ExtendedMetrics = {
     vscodeInstalled: false,
     copilotInstalled: false,
     copilotChatInstalled: false,
-    aiExtensions: [] as string[],
+    aiExtensions: [],
   }
 
   if (!fs.existsSync(extensionsDir)) {
@@ -18,6 +18,7 @@ export function collectVSCodeCopilot(): CollectorResult {
   }
 
   metrics.vscodeInstalled = true
+  const aiExtensions: string[] = []
 
   try {
     const extensions = fs.readdirSync(extensionsDir)
@@ -26,24 +27,24 @@ export function collectVSCodeCopilot(): CollectorResult {
       const lower = ext.toLowerCase()
       if (lower.startsWith('github.copilot-') && !lower.includes('chat')) {
         metrics.copilotInstalled = true
-        metrics.aiExtensions.push('GitHub Copilot')
+        aiExtensions.push('GitHub Copilot')
       }
       if (lower.includes('copilot-chat')) {
         metrics.copilotChatInstalled = true
-        metrics.aiExtensions.push('GitHub Copilot Chat')
+        aiExtensions.push('GitHub Copilot Chat')
       }
       if (lower.includes('codeium')) {
-        metrics.aiExtensions.push('Codeium')
+        aiExtensions.push('Codeium')
       }
       if (lower.includes('tabnine')) {
-        metrics.aiExtensions.push('Tabnine')
+        aiExtensions.push('Tabnine')
       }
       if (lower.includes('continue')) {
-        metrics.aiExtensions.push('Continue')
+        aiExtensions.push('Continue')
       }
     }
 
-    metrics.aiExtensions = [...new Set(metrics.aiExtensions)]
+    metrics.aiExtensions = [...new Set(aiExtensions)]
   } catch {}
 
   return { tool: 'vscode-copilot', metrics, collectedAt: new Date().toISOString() }

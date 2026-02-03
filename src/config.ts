@@ -10,6 +10,10 @@ export interface AgentConfig {
   authToken: string
   syncIntervalHours: number
   enabledCollectors: string[]
+  /** Clave AES-256 para encriptar datos sensibles (base64) */
+  encryptionKey?: string
+  /** Fecha en que se dio consentimiento (ISO string) */
+  consentGivenAt?: string
 }
 
 export function loadConfig(): AgentConfig {
@@ -26,4 +30,8 @@ export function saveConfig(config: AgentConfig): void {
 
 export function configExists(): boolean {
   return fs.existsSync(CONFIG_PATH)
+}
+
+export function getConfigDir(): string {
+  return CONFIG_DIR
 }

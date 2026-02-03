@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { loadConfig, saveConfig, configExists } from './config.js'
+import readline from 'readline'
+import { loadConfig, saveConfig, configExists, type AgentConfig } from './config.js'
 import { collectClaudeCode } from './collectors/claude-code.js'
 import { collectCursor } from './collectors/cursor.js'
 import { collectVSCodeCopilot } from './collectors/vscode-copilot.js'
@@ -13,37 +14,124 @@ const collectors: Record<string, () => CollectorResult> = {
   'vscode-copilot': collectVSCodeCopilot,
 }
 
-async function setup(token: string, serverUrl?: string) {
+const PRIVACY_NOTICE = `
+╔══════════════════════════════════════════════════════════════════╗
+║           Monitor IA Agent - Aviso de Privacidad                 ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  Este agente recolecta métricas de uso de tus herramientas de    ║
+║  IA para generar tu evaluación personalizada.                    ║
+║                                                                  ║
+║  DATOS RECOLECTADOS:                                             ║
+║  • Número de sesiones, tokens y tiempo de uso                    ║
+║  • Herramientas y modelos utilizados                             ║
+║  • Tipos de tareas (inferidos localmente)                        ║
+║  • Resúmenes de sesiones (encriptados antes de enviar)           ║
+║                                                                  ║
+║  NO SE RECOLECTA:                                                ║
+║  • Contenido de tus conversaciones                               ║
+║  • Código fuente                                                 ║
+║  • Rutas de archivos o directorios de trabajo                    ║
+║                                                                  ║
+║  Los datos sensibles se encriptan localmente con AES-256-GCM     ║
+║  antes de enviarse al servidor.                                  ║
+║                                                                  ║
+║  Puedes revocar tu consentimiento en cualquier momento desde     ║
+║  la página de privacidad en el dashboard.                        ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+`
+
+async function askForConsent(): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  return new Promise((resolve) => {
+    console.log(PRIVACY_NOTICE)
+    rl.question('¿Deseas continuar? [s/N] ', (answer) => {
+      rl.close()
+      const accepted = answer.toLowerCase() === 's' || answer.toLowerCase() === 'si' || answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes'
+      resolve(accepted)
+    })
+  })
+}
+
+async function setup(token: string, serverUrl?: string, skipConsent = false) {
   const url = serverUrl || 'http://localhost:3000'
 
-  // Fetch config from server
+  // Si ya existe config, preguntar si quiere reconfigurar
+  if (configExists()) {
+    console.log('El agente ya está configurado.')
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    })
+    const answer = await new Promise<string>((resolve) => {
+      rl.question('¿Deseas reconfigurar? [s/N] ', resolve)
+    })
+    rl.close()
+    if (answer.toLowerCase() !== 's' && answer.toLowerCase() !== 'si') {
+      console.log('Configuración cancelada.')
+      return
+    }
+  }
+
+  // Mostrar aviso de privacidad y pedir consentimiento
+  if (!skipConsent) {
+    const consent = await askForConsent()
+    if (!consent) {
+      console.log('\nConfiguración cancelada. No se instalará el agente.')
+      return
+    }
+  }
+
+  // Fetch config from server (incluye encryptionKey)
   let enabledCollectors = Object.keys(collectors)
+  let encryptionKey: string | undefined
+
   try {
     const response = await fetch(`${url}/api/agent/config`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (response.ok) {
-      const data = await response.json() as any
+      const data = await response.json() as { enabledCollectors?: string[], encryptionKey?: string }
       if (data.enabledCollectors?.length) {
         enabledCollectors = data.enabledCollectors
       }
+      if (data.encryptionKey) {
+        encryptionKey = data.encryptionKey
+      }
     }
   } catch {
-    console.log('No se pudo conectar al servidor, usando configuración por defecto')
+    console.log('No se pudo conectar al servidor para obtener configuración.')
+    console.log('Usando configuración por defecto.')
   }
 
-  saveConfig({
+  const config: AgentConfig = {
     serverUrl: url,
     authToken: token,
     syncIntervalHours: 6,
     enabledCollectors,
-  })
+    consentGivenAt: new Date().toISOString(),
+  }
 
-  console.log('Agente configurado correctamente')
+  if (encryptionKey) {
+    config.encryptionKey = encryptionKey
+  }
+
+  saveConfig(config)
+
+  console.log('\n✓ Agente configurado correctamente')
   console.log(`  Servidor: ${url}`)
   console.log(`  Collectors: ${enabledCollectors.join(', ')}`)
   console.log(`  Intervalo: 6 horas`)
-  console.log('\nEjecuta: monitor-ia-agent run')
+  console.log(`  Encriptación: ${encryptionKey ? 'habilitada' : 'deshabilitada'}`)
+  console.log(`  Consentimiento: dado en ${new Date().toLocaleString()}`)
+  console.log('\nSiguientes pasos:')
+  console.log('  1. Ejecuta: monitor-ia-agent run-once    (para probar)')
+  console.log('  2. Ejecuta: monitor-ia-agent service install  (para ejecución automática)')
 }
 
 function runCollectors(enabled: string[]): CollectorResult[] {
@@ -57,9 +145,22 @@ function runCollectors(enabled: string[]): CollectorResult[] {
     }
     try {
       console.log(`  Recolectando: ${name}...`)
-      results.push(collector())
-    } catch (err: any) {
-      console.error(`  Error en ${name}: ${err.message}`)
+      const result = collector()
+      results.push(result)
+
+      // Mostrar resumen breve
+      if (result.metrics.sessionsCount !== undefined) {
+        console.log(`    → ${result.metrics.sessionsCount} sesiones`)
+      }
+      if (result.metrics.totalTokens !== undefined && result.metrics.totalTokens > 0) {
+        console.log(`    → ${result.metrics.totalTokens.toLocaleString()} tokens`)
+      }
+      if (result.metrics.encrypted) {
+        console.log(`    → datos sensibles encriptados`)
+      }
+    } catch (err: unknown) {
+      const error = err as Error
+      console.error(`  Error en ${name}: ${error.message}`)
     }
   }
 
@@ -83,6 +184,7 @@ async function run() {
   console.log(`  Servidor: ${config.serverUrl}`)
   console.log(`  Intervalo: ${config.syncIntervalHours}h`)
   console.log(`  Collectors: ${config.enabledCollectors.join(', ')}`)
+  console.log(`  Encriptación: ${config.encryptionKey ? 'habilitada' : 'deshabilitada'}`)
 
   async function cycle() {
     console.log(`\n[${new Date().toLocaleString()}] Ejecutando recolección...`)
@@ -113,7 +215,7 @@ function configInterval(hours: number) {
   saveConfig(config)
   console.log(`Intervalo actualizado a ${hours}h`)
   console.log('Si tienes el servicio instalado, reinstálalo para aplicar el cambio:')
-  console.log('  npx tsx src/index.ts service install')
+  console.log('  monitor-ia-agent service install')
 }
 
 function status() {
@@ -127,6 +229,10 @@ function status() {
   console.log(`  Servidor: ${config.serverUrl}`)
   console.log(`  Collectors: ${config.enabledCollectors.join(', ')}`)
   console.log(`  Intervalo: ${config.syncIntervalHours}h`)
+  console.log(`  Encriptación: ${config.encryptionKey ? 'habilitada' : 'deshabilitada'}`)
+  if (config.consentGivenAt) {
+    console.log(`  Consentimiento: dado en ${new Date(config.consentGivenAt).toLocaleString()}`)
+  }
 
   // Run collectors once to show current data
   console.log('\nDatos actuales:')
@@ -134,9 +240,42 @@ function status() {
   for (const r of results) {
     console.log(`\n  ${r.tool}:`)
     for (const [key, value] of Object.entries(r.metrics)) {
-      console.log(`    ${key}: ${JSON.stringify(value)}`)
+      if (key === 'encrypted') {
+        console.log(`    ${key}: [datos encriptados]`)
+      } else if (Array.isArray(value)) {
+        console.log(`    ${key}: [${value.length} elementos]`)
+      } else if (typeof value === 'object' && value !== null) {
+        console.log(`    ${key}: ${JSON.stringify(value)}`)
+      } else {
+        console.log(`    ${key}: ${value}`)
+      }
     }
   }
+}
+
+function showHelp() {
+  console.log('Monitor IA Agent v1.1.0')
+  console.log('')
+  console.log('Recolecta métricas de uso de herramientas de IA para tu evaluación personalizada.')
+  console.log('')
+  console.log('Comandos:')
+  console.log('  setup <token> [serverUrl]  - Configurar el agente (incluye aviso de privacidad)')
+  console.log('  run                        - Iniciar recolección continua')
+  console.log('  run-once                   - Ejecutar una sola recolección')
+  console.log('  status                     - Ver estado actual y datos recolectados')
+  console.log('  service install            - Instalar como servicio del sistema')
+  console.log('  service uninstall          - Desinstalar servicio')
+  console.log('  service status             - Ver estado del servicio')
+  console.log('  config interval <horas>    - Cambiar intervalo de recolección (1-24h)')
+  console.log('')
+  console.log('Ejemplo de uso:')
+  console.log('  1. monitor-ia-agent setup mia_tu_token_aqui https://tu-servidor.com')
+  console.log('  2. monitor-ia-agent run-once')
+  console.log('  3. monitor-ia-agent service install')
+  console.log('')
+  console.log('Privacidad:')
+  console.log('  Los datos sensibles se encriptan localmente antes de enviarse.')
+  console.log('  Puedes revocar tu consentimiento desde el dashboard en cualquier momento.')
 }
 
 // CLI
@@ -182,15 +321,11 @@ switch (command) {
       console.log('Uso: monitor-ia-agent config interval <horas>')
     }
     break
+  case '--help':
+  case '-h':
+  case 'help':
+    showHelp()
+    break
   default:
-    console.log('Monitor IA Agent')
-    console.log('\nComandos:')
-    console.log('  setup <token> [serverUrl]  - Configurar el agente')
-    console.log('  run                        - Iniciar recolección continua')
-    console.log('  run-once                   - Ejecutar una sola recolección')
-    console.log('  status                     - Ver estado actual')
-    console.log('  service install            - Instalar como servicio del sistema')
-    console.log('  service uninstall          - Desinstalar servicio')
-    console.log('  service status             - Ver estado del servicio')
-    console.log('  config interval <horas>    - Cambiar intervalo de recolección')
+    showHelp()
 }

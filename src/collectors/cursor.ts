@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import type { CollectorResult } from '../types.js'
+import type { CollectorResult, ExtendedMetrics } from '../types.js'
 
 export function collectCursor(): CollectorResult {
   const platform = os.platform()
@@ -15,7 +15,7 @@ export function collectCursor(): CollectorResult {
     cursorDir = path.join(os.homedir(), '.config', 'Cursor')
   }
 
-  const metrics: CollectorResult['metrics'] = {
+  const metrics: ExtendedMetrics = {
     installed: false,
     lastUsed: null,
   }
