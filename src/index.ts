@@ -8,7 +8,7 @@ import { sendMetrics } from './sender.js'
 import { serviceInstall, serviceUninstall, serviceStatus } from './service.js'
 import type { CollectorResult } from './types.js'
 
-const collectors: Record<string, () => CollectorResult> = {
+const collectors: Record<string, () => CollectorResult | Promise<CollectorResult>> = {
   'claude-code': collectClaudeCode,
   'cursor': collectCursor,
   'vscode-copilot': collectVSCodeCopilot,
@@ -134,7 +134,7 @@ async function setup(token: string, serverUrl?: string, skipConsent = false) {
   console.log('  2. Ejecuta: monitor-ia-agent service install  (para ejecución automática)')
 }
 
-function runCollectors(enabled: string[]): CollectorResult[] {
+async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
   const results: CollectorResult[] = []
 
   for (const name of enabled) {
@@ -145,7 +145,7 @@ function runCollectors(enabled: string[]): CollectorResult[] {
     }
     try {
       console.log(`  Recolectando: ${name}...`)
-      const result = collector()
+      const result = await Promise.resolve(collector())
       results.push(result)
 
       // Mostrar resumen breve
@@ -170,7 +170,7 @@ function runCollectors(enabled: string[]): CollectorResult[] {
 async function runOnce() {
   const config = loadConfig()
   console.log(`[${new Date().toLocaleString()}] Ejecutando recolección...`)
-  const results = runCollectors(config.enabledCollectors)
+  const results = await runCollectors(config.enabledCollectors)
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
@@ -188,7 +188,7 @@ async function run() {
 
   async function cycle() {
     console.log(`\n[${new Date().toLocaleString()}] Ejecutando recolección...`)
-    const results = runCollectors(config.enabledCollectors)
+    const results = await runCollectors(config.enabledCollectors)
     console.log(`  ${results.length} resultados recolectados`)
 
     if (results.length > 0) {
@@ -218,7 +218,7 @@ function configInterval(hours: number) {
   console.log('  monitor-ia-agent service install')
 }
 
-function status() {
+async function status() {
   if (!configExists()) {
     console.log('Agente no configurado. Ejecuta: monitor-ia-agent setup <token>')
     return
@@ -236,7 +236,7 @@ function status() {
 
   // Run collectors once to show current data
   console.log('\nDatos actuales:')
-  const results = runCollectors(config.enabledCollectors)
+  const results = await runCollectors(config.enabledCollectors)
   for (const r of results) {
     console.log(`\n  ${r.tool}:`)
     for (const [key, value] of Object.entries(r.metrics)) {
@@ -282,50 +282,57 @@ function showHelp() {
 const args = process.argv.slice(2)
 const command = args[0]
 
-switch (command) {
-  case 'setup':
-    if (!args[1]) {
-      console.error('Uso: monitor-ia-agent setup <token> [serverUrl]')
-      process.exit(1)
-    }
-    setup(args[1], args[2])
-    break
-  case 'run':
-    run()
-    break
-  case 'run-once':
-    runOnce()
-    break
-  case 'status':
-    status()
-    break
-  case 'service':
-    switch (args[1]) {
-      case 'install':
-        serviceInstall()
-        break
-      case 'uninstall':
-        serviceUninstall()
-        break
-      case 'status':
-        serviceStatus()
-        break
-      default:
-        console.log('Uso: monitor-ia-agent service <install|uninstall|status>')
-    }
-    break
-  case 'config':
-    if (args[1] === 'interval' && args[2]) {
-      configInterval(parseInt(args[2], 10))
-    } else {
-      console.log('Uso: monitor-ia-agent config interval <horas>')
-    }
-    break
-  case '--help':
-  case '-h':
-  case 'help':
-    showHelp()
-    break
-  default:
-    showHelp()
+async function main() {
+  switch (command) {
+    case 'setup':
+      if (!args[1]) {
+        console.error('Uso: monitor-ia-agent setup <token> [serverUrl]')
+        process.exit(1)
+      }
+      await setup(args[1], args[2])
+      break
+    case 'run':
+      await run()
+      break
+    case 'run-once':
+      await runOnce()
+      break
+    case 'status':
+      await status()
+      break
+    case 'service':
+      switch (args[1]) {
+        case 'install':
+          serviceInstall()
+          break
+        case 'uninstall':
+          serviceUninstall()
+          break
+        case 'status':
+          serviceStatus()
+          break
+        default:
+          console.log('Uso: monitor-ia-agent service <install|uninstall|status>')
+      }
+      break
+    case 'config':
+      if (args[1] === 'interval' && args[2]) {
+        configInterval(parseInt(args[2], 10))
+      } else {
+        console.log('Uso: monitor-ia-agent config interval <horas>')
+      }
+      break
+    case '--help':
+    case '-h':
+    case 'help':
+      showHelp()
+      break
+    default:
+      showHelp()
+  }
 }
+
+main().catch((err: Error) => {
+  console.error(err)
+  process.exit(1)
+})
