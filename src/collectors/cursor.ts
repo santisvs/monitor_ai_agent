@@ -125,9 +125,43 @@ function normalizeToCursorChatData(parsed: unknown): CursorChatData | null {
     }
     if (tabs.length) return { tabs }
   }
+  // composer.composerData: { allComposers: [ { type, composerId, name, bubbles?, conversation? } ] }
+  if (Array.isArray(o.allComposers)) {
+    const tabs: CursorChatData['tabs'] = []
+    for (const comp of o.allComposers as Record<string, unknown>[]) {
+      if (!comp || typeof comp !== 'object') continue
+      let bubbles: CursorBubble[] | undefined
+      if (Array.isArray(comp.bubbles)) bubbles = comp.bubbles as CursorBubble[]
+      else if (Array.isArray(comp.messages)) {
+        bubbles = (comp.messages as Array<{ role?: string; content?: string; text?: string }>).map(m => ({
+          type: (m.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+          text: (m.content ?? m.text ?? '') as string,
+          rawText: (m.content ?? m.text ?? '') as string,
+        }))
+      } else if (comp.conversation && typeof comp.conversation === 'object' && Array.isArray((comp.conversation as Record<string, unknown>).bubbles)) {
+        bubbles = (comp.conversation as { bubbles: CursorBubble[] }).bubbles
+      }
+      if (bubbles?.length) {
+        tabs.push({ bubbles })
+      } else if (comp.name && typeof comp.name === 'string') {
+        tabs.push({ bubbles: [{ type: 'user', text: comp.name, rawText: comp.name }] })
+      }
+    }
+    if (tabs.length) return { tabs }
+  }
+  // aiService.prompts: [ { text, commandType } ] — un tab con un bubble user por prompt
   if (Array.isArray(o) && o.length > 0) {
     const first = o[0] as Record<string, unknown>
     if (Array.isArray(first?.bubbles)) return { tabs: o as CursorChatData['tabs'] }
+    const withText = o.filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null && typeof (x as Record<string, unknown>).text === 'string')
+    if (withText.length > 0) {
+      const bubbles: CursorBubble[] = withText.map(p => ({
+        type: 'user' as const,
+        text: (p.text as string) || '',
+        rawText: (p.text as string) || '',
+      }))
+      return { tabs: [{ bubbles }] }
+    }
   }
   return null
 }
