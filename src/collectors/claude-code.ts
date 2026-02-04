@@ -130,14 +130,11 @@ export function collectClaudeCode(): CollectorResult {
       }
 
       // Buscar archivos .jsonl de sesiones
-      const sessionDir = path.join(projectPath, '.session')
-      if (!fs.existsSync(sessionDir)) continue
+      // La CLI de Claude Code guarda sesiones en la raíz del proyecto y a veces en subcarpetas UUID.
+      // No usa la carpeta .session; esa era una estructura antigua o distinta.
+      const sessionPaths = listSessionJsonlFiles(projectPath)
 
-      const sessionFiles = fs.readdirSync(sessionDir).filter(f => f.endsWith('.jsonl'))
-
-      for (const sessionFile of sessionFiles) {
-        const sessionPath = path.join(sessionDir, sessionFile)
-        const sessionId = sessionFile.replace('.jsonl', '')
+      for (const { sessionPath, sessionId } of sessionPaths) {
 
         try {
           const fileStat = fs.statSync(sessionPath)
@@ -243,6 +240,45 @@ export function collectClaudeCode(): CollectorResult {
   }
 
   return { tool: 'claude-code', metrics, collectedAt: new Date().toISOString() }
+}
+
+/**
+ * Lista todos los archivos .jsonl de sesiones en un proyecto de Claude Code.
+ * La CLI guarda sesiones en la raíz del proyecto y a veces en subcarpetas por UUID.
+ * Excluye subagents para no contar subagentes como sesiones principales.
+ */
+function listSessionJsonlFiles(projectPath: string): Array<{ sessionPath: string; sessionId: string }> {
+  const result: Array<{ sessionPath: string; sessionId: string }> = []
+  const seenIds = new Set<string>()
+
+  if (!fs.existsSync(projectPath)) return result
+
+  const addIfNew = (sessionPath: string, sessionId: string) => {
+    if (seenIds.has(sessionId)) return
+    seenIds.add(sessionId)
+    result.push({ sessionPath, sessionId })
+  }
+
+  try {
+    const entries = fs.readdirSync(projectPath, { withFileTypes: true })
+    for (const e of entries) {
+      if (e.isFile() && e.name.endsWith('.jsonl')) {
+        addIfNew(path.join(projectPath, e.name), e.name.replace(/\.jsonl$/, ''))
+      }
+      if (e.isDirectory() && e.name !== 'subagents' && e.name !== 'tool-results') {
+        const subPath = path.join(projectPath, e.name)
+        const subEntries = fs.readdirSync(subPath, { withFileTypes: true })
+        for (const se of subEntries) {
+          if (se.isFile() && se.name.endsWith('.jsonl')) {
+            addIfNew(path.join(subPath, se.name), se.name.replace(/\.jsonl$/, ''))
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return result
 }
 
 /**
