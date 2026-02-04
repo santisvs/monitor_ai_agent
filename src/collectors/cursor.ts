@@ -194,18 +194,45 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
       return typeof value === 'string' ? value : null
     }
     stmt.free()
-    if (logKeysIfMissing) {
-      const keysStmt = db.prepare('SELECT key FROM ItemTable')
-      const keys: string[] = []
-      while (keysStmt.step()) {
-        const o = keysStmt.getAsObject() as { key?: string }
-        if (o?.key) keys.push(o.key)
-        if (keys.length >= 40) break
+
+    // Fallback: buscar cualquier clave que parezca chat (por si Cursor cambió el nombre)
+    const keysStmt = db.prepare('SELECT key FROM ItemTable')
+    const allKeys: string[] = []
+    while (keysStmt.step()) {
+      const o = keysStmt.getAsObject() as { key?: string }
+      if (o?.key) allKeys.push(o.key)
+    }
+    keysStmt.free()
+    const chatLikeKeys = allKeys.filter(k => /aichat|chatdata|ai\.?service\.?prompts|composer.*chat|panel.*aichat/i.test(k))
+    for (const key of chatLikeKeys) {
+      const valueStmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?')
+      valueStmt.bind([key])
+      if (valueStmt.step()) {
+        const row = valueStmt.getAsObject() as { value?: string }
+        const value = row?.value
+        valueStmt.free()
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value) as CursorChatData
+            if (Array.isArray(parsed?.tabs)) {
+              if (DEBUG_CURSOR) console.warn('[Cursor debug] datos de chat encontrados con clave alternativa:', key)
+              db.close()
+              return value
+            }
+          } catch {
+            // no es JSON válido o no tiene tabs
+          }
+        }
+      } else {
+        valueStmt.free()
       }
-      keysStmt.free()
-      const chatKeys = keys.filter(k => /chat|aichat|ai\.service/i.test(k))
+    }
+
+    if (logKeysIfMissing) {
+      const broadMatch = allKeys.filter(k => /workbench|panel|view|chat|ai|composer|prompt/i.test(k))
       console.warn('[Cursor debug] clave no encontrada:', CHATDATA_KEY)
-      console.warn('[Cursor debug] claves en ItemTable (máx. 40, filtro chat/aichat):', chatKeys.length ? chatKeys : keys.slice(0, 20))
+      console.warn('[Cursor debug] claves que parecen chat (aichat/chatdata/prompts):', chatLikeKeys.length ? chatLikeKeys : '(ninguna)')
+      console.warn('[Cursor debug] claves con workbench/panel/view/chat/ai/composer/prompt:', broadMatch.length ? broadMatch : '(ninguna)')
     }
   } catch (e) {
     if (DEBUG_CURSOR) console.warn('[Cursor debug] error al leer ItemTable:', (e as Error).message)
@@ -283,23 +310,7 @@ export async function collectCursor(): Promise<CollectorResult> {
     return { tool: 'cursor', metrics, collectedAt: new Date().toISOString() }
   }
 
-  const dbPaths: string[] = []
-  for (const workspaceId of entries) {
-    const workspacePath = path.join(workspaceStorageDir, workspaceId)
-    try {
-      if (!fs.statSync(workspacePath).isDirectory()) continue
-    } catch {
-      continue
-    }
-    const p = path.join(workspacePath, 'state.vscdb')
-    if (fs.existsSync(p)) dbPaths.push(p)
-  }
-  if (DEBUG_CURSOR) {
-    console.warn('[Cursor debug] workspaceStorage:', workspaceStorageDir)
-    console.warn('[Cursor debug] state.vscdb encontrados:', dbPaths.length)
-  }
-
-  let logKeysOnce = DEBUG_CURSOR
+  const workspaceEntries: { id: string; path: string; mtime: number }[] = []
   for (const workspaceId of entries) {
     const workspacePath = path.join(workspaceStorageDir, workspaceId)
     let stat: fs.Stats
@@ -309,13 +320,28 @@ export async function collectCursor(): Promise<CollectorResult> {
     } catch {
       continue
     }
-    workspaceCount++
     const dbPath = path.join(workspacePath, 'state.vscdb')
     if (!fs.existsSync(dbPath)) continue
+    workspaceEntries.push({ id: workspaceId, path: dbPath, mtime: stat.mtimeMs })
+  }
+  workspaceEntries.sort((a, b) => b.mtime - a.mtime)
+  if (DEBUG_CURSOR) {
+    console.warn('[Cursor debug] workspaceStorage:', workspaceStorageDir)
+    console.warn('[Cursor debug] state.vscdb encontrados:', workspaceEntries.length, '(ordenados por más reciente primero)')
+  }
+
+  let logKeysOnce = DEBUG_CURSOR
+  for (const { id: workspaceId, path: dbPath, mtime } of workspaceEntries) {
+    const workspacePath = path.dirname(dbPath)
+    let stat: fs.Stats
     try {
-      if (stat.mtimeMs > latestTime) latestTime = stat.mtimeMs
-      sessionDates.push(stat.mtimeMs)
-    } catch {}
+      stat = fs.statSync(workspacePath)
+    } catch {
+      continue
+    }
+    workspaceCount++
+    if (stat.mtimeMs > latestTime) latestTime = stat.mtimeMs
+    sessionDates.push(stat.mtimeMs)
 
     const chatJson = await readChatDataFromStateVscdb(dbPath, logKeysOnce)
     if (!chatJson) {
