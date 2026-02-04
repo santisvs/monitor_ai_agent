@@ -98,6 +98,41 @@ function extractUserBubbleText(bubble: CursorBubble): string {
 }
 
 /**
+ * Normaliza JSON parseado a la forma { tabs: [ { bubbles: [...] } ] } para distintas variantes de Cursor.
+ */
+function normalizeToCursorChatData(parsed: unknown): CursorChatData | null {
+  if (!parsed || typeof parsed !== 'object') return null
+  const o = parsed as Record<string, unknown>
+  if (Array.isArray(o.tabs)) return { tabs: o.tabs as CursorChatData['tabs'] }
+  if (Array.isArray((o.data as Record<string, unknown>)?.tabs)) {
+    return { tabs: (o.data as { tabs: CursorChatData['tabs'] }).tabs }
+  }
+  if (Array.isArray(o.bubbles)) {
+    return { tabs: [{ bubbles: o.bubbles as CursorBubble[] }] }
+  }
+  if (Array.isArray(o.conversations)) {
+    const tabs: CursorChatData['tabs'] = []
+    for (const c of o.conversations as Record<string, unknown>[]) {
+      if (Array.isArray(c?.bubbles)) tabs.push({ bubbles: c.bubbles as CursorBubble[] })
+      else if (Array.isArray(c?.messages)) {
+        const bubbles = (c.messages as Array<{ role?: string; content?: string; rawText?: string }>).map(m => ({
+          type: (m.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+          text: m.content ?? m.rawText ?? '',
+          rawText: m.rawText ?? m.content ?? '',
+        }))
+        if (bubbles.length) tabs.push({ bubbles })
+      }
+    }
+    if (tabs.length) return { tabs }
+  }
+  if (Array.isArray(o) && o.length > 0) {
+    const first = o[0] as Record<string, unknown>
+    if (Array.isArray(first?.bubbles)) return { tabs: o as CursorChatData['tabs'] }
+  }
+  return null
+}
+
+/**
  * Parsea el JSON de chatdata y devuelve sesiones (una por tab) con turns, firstPrompt, model, etc.
  */
 function parseChatDataToSessions(
@@ -105,12 +140,15 @@ function parseChatDataToSessions(
   workspaceId: string,
 ): SessionAnalysis[] {
   const sessions: SessionAnalysis[] = []
-  let data: CursorChatData
+  let data: CursorChatData | null
   try {
-    data = JSON.parse(chatJson) as CursorChatData
+    const parsed = JSON.parse(chatJson) as unknown
+    data = normalizeToCursorChatData(parsed)
+    if (!data) data = (parsed as CursorChatData)?.tabs ? (parsed as CursorChatData) : null
   } catch {
     return sessions
   }
+  if (!data) return sessions
   const tabs = data.tabs
   if (!Array.isArray(tabs)) return sessions
 
@@ -203,8 +241,16 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
       if (o?.key) allKeys.push(o.key)
     }
     keysStmt.free()
-    const chatLikeKeys = allKeys.filter(k => /aichat|chatdata|ai\.?service\.?prompts|composer.*chat|panel.*aichat/i.test(k))
-    for (const key of chatLikeKeys) {
+    const chatLikeKeys = allKeys.filter(k =>
+      /aichat|chatdata|ai\.?service\.?prompts|composer.*chat|panel.*aichat|composer\.composerData|workbench\.panel\.composerChatViewPane\./i.test(k),
+    )
+    const composerDataKey = chatLikeKeys.find(k => k === 'composer.composerData')
+    const composerPaneKeys = chatLikeKeys.filter(k => k.startsWith('workbench.panel.composerChatViewPane.'))
+    const otherKeys = chatLikeKeys.filter(k => k !== 'composer.composerData' && !k.startsWith('workbench.panel.composerChatViewPane.'))
+
+    const keysToTry = [composerDataKey, ...composerPaneKeys, ...otherKeys].filter(Boolean) as string[]
+
+    for (const key of keysToTry) {
       const valueStmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?')
       valueStmt.bind([key])
       if (valueStmt.step()) {
@@ -213,19 +259,51 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
         valueStmt.free()
         if (typeof value === 'string') {
           try {
-            const parsed = JSON.parse(value) as CursorChatData
-            if (Array.isArray(parsed?.tabs)) {
-              if (DEBUG_CURSOR) console.warn('[Cursor debug] datos de chat encontrados con clave alternativa:', key)
+            const parsed = JSON.parse(value) as unknown
+            const normalized = normalizeToCursorChatData(parsed)
+            if (normalized?.tabs?.length) {
+              if (DEBUG_CURSOR) console.warn('[Cursor debug] datos de chat encontrados con clave:', key)
               db.close()
-              return value
+              return JSON.stringify(normalized)
             }
           } catch {
-            // no es JSON válido o no tiene tabs
+            // no es JSON válido o no tiene estructura reconocida
           }
         }
       } else {
         valueStmt.free()
       }
+    }
+
+    const collectedTabs: CursorChatData['tabs'] = []
+    for (const key of composerPaneKeys) {
+      const valueStmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?')
+      valueStmt.bind([key])
+      if (valueStmt.step()) {
+        const row = valueStmt.getAsObject() as { value?: string }
+        const value = row?.value
+        valueStmt.free()
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value) as unknown
+            const normalized = normalizeToCursorChatData(parsed)
+            if (normalized?.tabs?.length) {
+              for (const tab of normalized.tabs) {
+                if (tab?.bubbles?.length) collectedTabs.push(tab)
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } else {
+        valueStmt.free()
+      }
+    }
+    if (collectedTabs.length > 0) {
+      if (DEBUG_CURSOR) console.warn('[Cursor debug] datos de chat reunidos desde', collectedTabs.length, 'composerChatViewPane')
+      db.close()
+      return JSON.stringify({ tabs: collectedTabs })
     }
 
     if (logKeysIfMissing) {
