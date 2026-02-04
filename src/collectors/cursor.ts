@@ -250,6 +250,14 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
 
     const keysToTry = [composerDataKey, ...composerPaneKeys, ...otherKeys].filter(Boolean) as string[]
 
+    const debugSample = (obj: unknown, maxLen: number): string => {
+      if (obj == null) return String(obj)
+      if (typeof obj !== 'object') return String(obj).slice(0, maxLen)
+      const keys = Object.keys(obj as object)
+      const preview = JSON.stringify(obj).slice(0, maxLen)
+      return `{ keys: [${keys.join(', ')}], preview: ${preview}... }`
+    }
+
     for (const key of keysToTry) {
       const valueStmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?')
       valueStmt.bind([key])
@@ -266,8 +274,13 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
               db.close()
               return JSON.stringify(normalized)
             }
-          } catch {
-            // no es JSON válido o no tiene estructura reconocida
+            if (DEBUG_CURSOR && logKeysIfMissing) {
+              console.warn('[Cursor debug] clave candidata sin estructura reconocida:', key, debugSample(parsed, 300))
+            }
+          } catch (e) {
+            if (DEBUG_CURSOR && logKeysIfMissing) {
+              console.warn('[Cursor debug] clave candidata JSON inválido:', key, (e as Error).message)
+            }
           }
         }
       } else {
