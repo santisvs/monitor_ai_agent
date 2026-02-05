@@ -236,31 +236,43 @@ function parseChatDataToSessions(
 let sqlJsModule: { Database: new (data?: BufferSource) => SQLiteDB } | null = null
 let sqlJsLoadFailed = false
 
+// Detecta si estamos corriendo dentro de un ejecutable de pkg
+const isPackaged = !!(process as unknown as { pkg?: unknown }).pkg
+
 async function loadSqlJs(): Promise<{ Database: new (data?: BufferSource) => SQLiteDB } | null> {
   if (sqlJsLoadFailed) return null
   if (sqlJsModule) return sqlJsModule
 
+  // Si estamos en un ejecutable empaquetado, buscar el wasm primero
+  // y si no existe, no intentar cargar sql.js (evita crash)
+  const possiblePaths = [
+    path.join(__dirname, 'sql-wasm.wasm'),
+    path.join(process.cwd(), 'sql-wasm.wasm'),
+    path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
+    path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+  ]
+
+  let wasmBinary: Buffer | undefined
+  for (const p of possiblePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        wasmBinary = fs.readFileSync(p)
+        if (DEBUG_CURSOR) console.warn('[Cursor debug] wasm encontrado en:', p)
+        break
+      }
+    } catch {}
+  }
+
+  // Si estamos empaquetados y no hay wasm, saltar sql.js para evitar crash
+  if (isPackaged && !wasmBinary) {
+    if (DEBUG_CURSOR) console.warn('[Cursor debug] Ejecutable empaquetado sin wasm, saltando sql.js')
+    sqlJsLoadFailed = true
+    return null
+  }
+
   try {
     const init = (await import('sql.js')).default as (config?: unknown) => Promise<{ Database: new (data?: BufferSource) => SQLiteDB }>
-
-    // Buscar el archivo wasm en varias ubicaciones posibles
-    const possiblePaths = [
-      path.join(__dirname, 'sql-wasm.wasm'),
-      path.join(process.cwd(), 'sql-wasm.wasm'),
-      path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
-      path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-      path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-    ]
-
-    let wasmBinary: Buffer | undefined
-    for (const p of possiblePaths) {
-      try {
-        if (fs.existsSync(p)) {
-          wasmBinary = fs.readFileSync(p)
-          break
-        }
-      } catch {}
-    }
 
     if (wasmBinary) {
       sqlJsModule = await init({ wasmBinary })
