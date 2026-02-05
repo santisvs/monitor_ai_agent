@@ -8,6 +8,9 @@ const TASK_NAME = 'MonitorIA-Agent'
 const AGENT_DIR = path.join(os.homedir(), '.monitor-ia', 'agent')
 const platform = os.platform()
 
+// Detecta si estamos corriendo como ejecutable empaquetado con pkg
+const isPackaged = !!(process as unknown as { pkg?: unknown }).pkg
+
 function getNodePath(): string {
   try {
     const nodePath = execSync(platform === 'win32' ? 'where node' : 'which node', { encoding: 'utf-8' }).trim().split('\n')[0]
@@ -17,24 +20,34 @@ function getNodePath(): string {
   }
 }
 
+function getExecutablePath(): { exePath: string; needsNode: boolean } {
+  if (isPackaged) {
+    // Estamos corriendo como ejecutable empaquetado
+    return { exePath: process.execPath, needsNode: false }
+  }
+  // Estamos corriendo con node
+  const scriptPath = path.join(AGENT_DIR, 'dist', 'index.js')
+  return { exePath: scriptPath, needsNode: true }
+}
+
 export function serviceInstall(): void {
   const config = loadConfig()
   const intervalHours = config.syncIntervalHours || 6
-  const nodePath = getNodePath()
-  const scriptPath = path.join(AGENT_DIR, 'dist', 'index.js')
+  const { exePath, needsNode } = getExecutablePath()
+  const nodePath = needsNode ? getNodePath() : ''
 
-  if (!fs.existsSync(scriptPath)) {
-    console.error(`Error: No se encuentra ${scriptPath}`)
+  if (needsNode && !fs.existsSync(exePath)) {
+    console.error(`Error: No se encuentra ${exePath}`)
     console.error('Ejecuta "npm run build" primero.')
     process.exit(1)
   }
 
   if (platform === 'win32') {
-    installWindows(nodePath, scriptPath, intervalHours)
+    installWindows(nodePath, exePath, intervalHours)
   } else if (platform === 'darwin') {
-    installMac(nodePath, scriptPath, intervalHours)
+    installMac(nodePath, exePath, intervalHours)
   } else {
-    installLinux(nodePath, scriptPath, intervalHours)
+    installLinux(nodePath, exePath, intervalHours)
   }
 }
 
@@ -67,16 +80,20 @@ function installWindows(nodePath: string, scriptPath: string, intervalHours: num
   } catch {}
 
   const intervalMinutes = intervalHours * 60
-  const cmd = `schtasks /Create /TN "${TASK_NAME}" /TR "\\"${nodePath}\\" \\"${scriptPath}\\" run-once" /SC MINUTE /MO ${intervalMinutes} /F`
+  // Si nodePath está vacío, scriptPath es un ejecutable standalone
+  const taskCommand = nodePath
+    ? `\\"${nodePath}\\" \\"${scriptPath}\\" run-once`
+    : `\\"${scriptPath}\\" run-once`
+  const cmd = `schtasks /Create /TN "${TASK_NAME}" /TR "${taskCommand}" /SC MINUTE /MO ${intervalMinutes} /F`
 
   try {
     execSync(cmd, { stdio: 'ignore' })
     console.log('Servicio instalado correctamente (Task Scheduler)')
     console.log(`  Tarea: ${TASK_NAME}`)
     console.log(`  Intervalo: cada ${intervalHours}h`)
-    console.log(`  Comando: node ${scriptPath} run-once`)
-    console.log('\nPara verificar: npx tsx src/index.ts service status')
-    console.log('Para desinstalar: npx tsx src/index.ts service uninstall')
+    console.log(`  Comando: ${nodePath ? 'node ' + scriptPath : scriptPath} run-once`)
+    console.log('\nPara verificar: monitor-ia-agent service status')
+    console.log('Para desinstalar: monitor-ia-agent service uninstall')
   } catch (err: any) {
     console.error('Error al crear la tarea programada.')
     console.error('Puede que necesites ejecutar como administrador.')
@@ -113,7 +130,8 @@ function statusWindows() {
 // === LINUX ===
 
 function installLinux(nodePath: string, scriptPath: string, intervalHours: number) {
-  const cronLine = `0 */${intervalHours} * * * cd ${AGENT_DIR} && ${nodePath} ${scriptPath} run-once >> ${path.join(os.homedir(), '.monitor-ia', 'agent.log')} 2>&1`
+  const execCommand = nodePath ? `${nodePath} ${scriptPath}` : scriptPath
+  const cronLine = `0 */${intervalHours} * * * ${execCommand} run-once >> ${path.join(os.homedir(), '.monitor-ia', 'agent.log')} 2>&1`
 
   try {
     // Remove existing entry
@@ -129,7 +147,7 @@ function installLinux(nodePath: string, scriptPath: string, intervalHours: numbe
     console.log(`  Intervalo: cada ${intervalHours}h`)
     console.log(`  Log: ~/.monitor-ia/agent.log`)
     console.log('\nPara verificar: crontab -l')
-    console.log('Para desinstalar: npx tsx src/index.ts service uninstall')
+    console.log('Para desinstalar: monitor-ia-agent service uninstall')
   } catch (err: any) {
     console.error('Error al configurar cron:', err.message)
   }
@@ -169,7 +187,15 @@ function statusLinux() {
 
 const PLIST_PATH = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.monitor-ia.agent.plist')
 
-function installMac(nodePath: string, scriptPath: string, intervalHours: number) {
+function installMac(nodePath: string, exePath: string, intervalHours: number) {
+  // Build ProgramArguments based on whether we need node or not
+  const programArgs = nodePath
+    ? `        <string>${nodePath}</string>
+        <string>${exePath}</string>
+        <string>run-once</string>`
+    : `        <string>${exePath}</string>
+        <string>run-once</string>`
+
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -178,12 +204,10 @@ function installMac(nodePath: string, scriptPath: string, intervalHours: number)
     <string>com.monitor-ia.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${nodePath}</string>
-        <string>${scriptPath}</string>
-        <string>run-once</string>
+${programArgs}
     </array>
     <key>WorkingDirectory</key>
-    <string>${AGENT_DIR}</string>
+    <string>${path.join(os.homedir(), '.monitor-ia')}</string>
     <key>StartInterval</key>
     <integer>${intervalHours * 3600}</integer>
     <key>RunAtLoad</key>
