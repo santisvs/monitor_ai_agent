@@ -1,6 +1,6 @@
 {
   "name": "monitor-ia-agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
   "type": "module",
   "bin": {
@@ -8,7 +8,19 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=bundle/agent.cjs --format=cjs",
+    "pkg:win": "npx pkg bundle/agent.cjs --target node18-win-x64 --output releases/monitor-ia-agent-win.exe --compress GZip",
+    "pkg:linux": "npx pkg bundle/agent.cjs --target node18-linux-x64 --output releases/monitor-ia-agent-linux --compress GZip",
+    "pkg:mac": "npx pkg bundle/agent.cjs --target node18-macos-x64 --output releases/monitor-ia-agent-macos --compress GZip",
+    "pkg:all": "npm run bundle && npm run pkg:win && npm run pkg:linux && npm run pkg:mac",
+    "release": "npm run pkg:all"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
+    "outputPath": "releases"
   },
   "dependencies": {
     "sql.js": "^1.10.0",
@@ -17,6 +29,8 @@
   "devDependencies": {
     "typescript": "^5.5.0",
     "@types/node": "^22.0.0",
-    "@types/sql.js": "^1.4.9"
+    "@types/sql.js": "^1.4.9",
+    "esbuild": "^0.20.0",
+    "pkg": "^5.8.1"
   }
 }
