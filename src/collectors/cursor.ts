@@ -232,13 +232,52 @@ function parseChatDataToSessions(
  * Usa sql.js (WASM) para no depender de binarios nativos.
  * Si logKeysIfMissing y no hay valor, lista claves de ItemTable (solo una vez por ejecución para no repetir).
  */
-async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = false): Promise<string | null> {
-  let SQL: { Database: new (data?: BufferSource) => SQLiteDB }
+// Cache para evitar cargar sql.js múltiples veces
+let sqlJsModule: { Database: new (data?: BufferSource) => SQLiteDB } | null = null
+let sqlJsLoadFailed = false
+
+async function loadSqlJs(): Promise<{ Database: new (data?: BufferSource) => SQLiteDB } | null> {
+  if (sqlJsLoadFailed) return null
+  if (sqlJsModule) return sqlJsModule
+
   try {
     const init = (await import('sql.js')).default as (config?: unknown) => Promise<{ Database: new (data?: BufferSource) => SQLiteDB }>
-    SQL = await init()
+
+    // Buscar el archivo wasm en varias ubicaciones posibles
+    const possiblePaths = [
+      path.join(__dirname, 'sql-wasm.wasm'),
+      path.join(process.cwd(), 'sql-wasm.wasm'),
+      path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
+      path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+      path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    ]
+
+    let wasmBinary: Buffer | undefined
+    for (const p of possiblePaths) {
+      try {
+        if (fs.existsSync(p)) {
+          wasmBinary = fs.readFileSync(p)
+          break
+        }
+      } catch {}
+    }
+
+    if (wasmBinary) {
+      sqlJsModule = await init({ wasmBinary })
+    } else {
+      sqlJsModule = await init()
+    }
+    return sqlJsModule
   } catch (e) {
     if (DEBUG_CURSOR) console.warn('[Cursor debug] sql.js no pudo cargar:', (e as Error).message)
+    sqlJsLoadFailed = true
+    return null
+  }
+}
+
+async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = false): Promise<string | null> {
+  const SQL = await loadSqlJs()
+  if (!SQL) {
     return null
   }
   let buffer: Uint8Array
