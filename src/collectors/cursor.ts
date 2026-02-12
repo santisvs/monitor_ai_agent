@@ -249,13 +249,23 @@ async function loadSqlJs(): Promise<{ Database: new (data?: BufferSource) => SQL
 
   // Si estamos en un ejecutable empaquetado, buscar el wasm primero
   // y si no existe, no intentar cargar sql.js (evita crash)
+  const exeDir = path.dirname(process.execPath)
   const possiblePaths = [
     path.join(_cursorDir, 'sql-wasm.wasm'),
+    path.join(exeDir, 'sql-wasm.wasm'),
     path.join(process.cwd(), 'sql-wasm.wasm'),
     path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
     path.join(_cursorDir, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
     path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
   ]
+  if (DEBUG_CURSOR) {
+    console.warn('[Cursor debug] __dirname/_cursorDir:', _cursorDir)
+    console.warn('[Cursor debug] execPath dir:', exeDir)
+    console.warn('[Cursor debug] cwd:', process.cwd())
+    for (const p of possiblePaths) {
+      console.warn(`[Cursor debug]   ${p} -> ${fs.existsSync(p) ? 'EXISTE' : 'no'}`)
+    }
+  }
 
   let wasmBinary: Buffer | undefined
   for (const p of possiblePaths) {
