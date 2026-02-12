@@ -3,8 +3,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import os from 'os'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// __dirname polyfill: in CJS (esbuild bundle/pkg) it exists natively; in ESM it doesn't
+const _cursorDir: string = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url))
 import type {
   CollectorResult,
   ExtendedMetrics,
@@ -250,10 +250,10 @@ async function loadSqlJs(): Promise<{ Database: new (data?: BufferSource) => SQL
   // Si estamos en un ejecutable empaquetado, buscar el wasm primero
   // y si no existe, no intentar cargar sql.js (evita crash)
   const possiblePaths = [
-    path.join(__dirname, 'sql-wasm.wasm'),
+    path.join(_cursorDir, 'sql-wasm.wasm'),
     path.join(process.cwd(), 'sql-wasm.wasm'),
     path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
-    path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    path.join(_cursorDir, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
     path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
   ]
 
