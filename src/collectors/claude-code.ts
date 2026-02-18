@@ -14,6 +14,16 @@ import type {
 import { inferTaskType, detectsPlanMode } from '../task-inference.js'
 import { encrypt, isValidEncryptionKey } from '../crypto.js'
 import { loadConfig } from '../config.js'
+import {
+  aggregatePromptingMetrics,
+  analyzeSessionPrompts,
+  type ContentBlock,
+  type SessionMessage,
+} from '../analyzers/prompt-analyzer.js'
+import {
+  aggregateWorkflowMetrics,
+  analyzeSessionWorkflow,
+} from '../analyzers/workflow-analyzer.js'
 
 interface SessionAnalysis {
   sessionId: string
@@ -21,10 +31,14 @@ interface SessionAnalysis {
   tokens: number
   model: string
   toolsUsed: string[]
+  /** Skills invocadas vía tool_calls del asistente (p.ej. Skill{skill:"executing-plans"}) */
+  skillsFromToolCalls: string[]
   usesExtendedThinking: boolean
   summary?: string
   firstPrompt?: string
   taskType: TaskType
+  /** Mensajes de la sesión (user/assistant) para análisis de prompting */
+  messages: SessionMessage[]
 }
 
 /**
@@ -55,6 +69,7 @@ export function collectClaudeCode(): CollectorResult {
   }
 
   if (!fs.existsSync(claudeDir)) {
+    metrics.workflow = aggregateWorkflowMetrics([])
     return { tool: 'claude-code', metrics, collectedAt: new Date().toISOString() }
   }
 
@@ -94,6 +109,7 @@ export function collectClaudeCode(): CollectorResult {
   }
 
   if (!fs.existsSync(projectsDir)) {
+    metrics.workflow = aggregateWorkflowMetrics([])
     return { tool: 'claude-code', metrics, collectedAt: new Date().toISOString() }
   }
 
@@ -223,6 +239,19 @@ export function collectClaudeCode(): CollectorResult {
   metrics.modelsUsed = modelsUsed.sort((a, b) => b.sessions - a.sessions)
   metrics.modelDiversity = modelsUsed.length
 
+  // Métricas de prompting (últimas 50 sesiones, análisis local)
+  const recentSessions = sessionAnalyses.slice(-50)
+  const promptingData = recentSessions
+    .filter(s => s.messages.length > 0)
+    .map(s => analyzeSessionPrompts(s.messages))
+  metrics.prompting = aggregatePromptingMetrics(promptingData)
+
+  // Métricas de workflow (skills, @refs, flujos, meta-instrucciones)
+  const workflowData = recentSessions
+    .filter(s => s.messages.length > 0)
+    .map(s => analyzeSessionWorkflow(s.messages, s.skillsFromToolCalls))
+  metrics.workflow = aggregateWorkflowMetrics(workflowData)
+
   // Encriptar datos sensibles si hay clave
   if (isValidEncryptionKey(encryptionKey) && sessionAnalyses.length > 0) {
     const sessionDetails: SessionDetail[] = sessionAnalyses.map(s => ({
@@ -297,8 +326,10 @@ function analyzeSession(
     let tokens = 0
     let model = 'unknown'
     const toolsUsed = new Set<string>()
+    const skillsFromToolCalls = new Set<string>()
     let usesExtendedThinking = false
     let firstPrompt = ''
+    const messages: SessionMessage[] = []
 
     for (const line of lines) {
       try {
@@ -307,6 +338,14 @@ function analyzeSession(
         // Contar turnos (mensajes de usuario y asistente)
         if (msg.message?.role === 'user' || msg.message?.role === 'assistant') {
           turns++
+          const role = msg.message.role
+          const content = msg.message.content
+          if (content !== undefined && content !== null) {
+            messages.push({
+              role: role === 'user' ? 'human' : 'assistant',
+              content: content as string | ContentBlock[],
+            })
+          }
         }
 
         // Capturar modelo
@@ -323,7 +362,19 @@ function analyzeSession(
         if (msg.message?.tool_calls && Array.isArray(msg.message.tool_calls)) {
           for (const call of msg.message.tool_calls) {
             if (typeof call === 'object' && call !== null && 'name' in call) {
-              toolsUsed.add((call as { name: string }).name.toLowerCase())
+              const callAny = call as { name?: unknown; input?: unknown }
+              const callName = typeof callAny.name === 'string' ? callAny.name : ''
+              if (callName) {
+                toolsUsed.add(callName.toLowerCase())
+              }
+
+              // Capturar skills invocadas por el asistente (Tool: Skill)
+              if (callName === 'Skill' && callAny.input && typeof callAny.input === 'object') {
+                const inputAny = callAny.input as { skill?: unknown }
+                if (typeof inputAny.skill === 'string' && inputAny.skill.trim().length > 0) {
+                  skillsFromToolCalls.add(inputAny.skill)
+                }
+              }
             }
           }
         }
@@ -362,10 +413,12 @@ function analyzeSession(
       tokens, // Tokens se calculan desde stats-cache
       model,
       toolsUsed: Array.from(toolsUsed),
+      skillsFromToolCalls: Array.from(skillsFromToolCalls),
       usesExtendedThinking,
       summary,
       firstPrompt,
       taskType,
+      messages,
     }
   } catch {
     return null

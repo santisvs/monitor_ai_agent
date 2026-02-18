@@ -9,6 +9,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "bundle": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=bundle/agent.cjs --format=cjs && node -e \"require('fs').copyFileSync('node_modules/sql.js/dist/sql-wasm.wasm', 'bundle/sql-wasm.wasm')\"",
     "pkg:win": "npx pkg bundle/agent.cjs --target node18-win-x64 --output releases/monitor-ia-agent-win.exe --compress GZip",
     "pkg:linux": "npx pkg bundle/agent.cjs --target node18-linux-x64 --output releases/monitor-ia-agent-linux --compress GZip",
@@ -34,6 +36,7 @@
     "@types/node": "^22.0.0",
     "@types/sql.js": "^1.4.9",
     "esbuild": "^0.20.0",
-    "pkg": "^5.8.1"
+    "pkg": "^5.8.1",
+    "vitest": "^2.0.0"
   }
 }

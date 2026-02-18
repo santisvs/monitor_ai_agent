@@ -158,6 +158,9 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
       if (result.metrics.encrypted) {
         console.log(`    → datos sensibles encriptados`)
       }
+      if (result.metrics.prompting?.totalPromptsAnalyzed !== undefined && result.metrics.prompting.totalPromptsAnalyzed > 0) {
+        console.log(`    → prompting: ${result.metrics.prompting.totalPromptsAnalyzed} prompts analizados`)
+      }
     } catch (err: unknown) {
       const error = err as Error
       console.error(`  Error en ${name}: ${error.message}`)

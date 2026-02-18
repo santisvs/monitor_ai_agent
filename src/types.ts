@@ -1,4 +1,82 @@
 /**
+ * Métricas de prompting (compartidas con servidor y plugin)
+ */
+export interface PromptingMetrics {
+  avgPromptLength: number
+  maxPromptLength: number
+  promptLengthDistribution: {
+    short: number
+    medium: number
+    long: number
+    detailed: number
+  }
+  structuredPromptRate: number
+  usesCodeBlocks: boolean
+  usesExamples: boolean
+  usesFormatting: boolean
+  contextProvisionRate: number
+  referencesFiles: boolean
+  referencesCode: boolean
+  referencesUrls: boolean
+  avgTurnsBeforeResolution: number
+  refinementRate: number
+  followUpRate: number
+  usesRolePrompting: boolean
+  usesConstraints: boolean
+  usesStepByStep: boolean
+  specifiesOutputFormat: boolean
+  totalPromptsAnalyzed: number
+  analysisVersion: string
+}
+
+/**
+ * Métricas de workflow (orquestación del trabajo con IA). Compartidas con servidor.
+ */
+export interface WorkflowMetrics {
+  skillsUsed: string[]
+  skillUsageCount: number
+  uniqueSkillsCount: number
+  skillsPerSession: number
+  atReferencesCount: number
+  atReferencesPerSession: number
+  uniqueFilesReferenced: number
+  usesPlanFiles: boolean
+  usesConfigFiles: boolean
+  pathsInPrompts: number
+  sessionsWithPlan: number
+  sessionsWithVerification: number
+  sessionsWithReview: number
+  fullFlowSessions: number
+  avgActionsPerSession: number
+  definesProcess: boolean
+  setsConstraints: boolean
+  requestsVerification: boolean
+  definesAcceptanceCriteria: boolean
+  directiveRate: number
+  totalSessionsAnalyzed: number
+  analysisVersion: string
+}
+
+export interface DetectedFlow {
+  name: string
+  count: number
+}
+
+export interface WorkflowScore {
+  overall: number
+  level: 'ad-hoc' | 'básico' | 'estructurado' | 'optimizado'
+  dimensions: {
+    skillAdoption: number
+    fileOrchestration: number
+    processMaturity: number
+    metaCognition: number
+  }
+  detectedFlows: DetectedFlow[]
+  totalAnalyzed: number
+  recommendations: string[]
+}
+
+/**
  * Tipos de tareas inferidas localmente
  */
 export type TaskType =
@@ -68,6 +146,12 @@ export interface ExtendedMetrics {
 
   // Datos encriptados (solo si hay clave de encriptación)
   encrypted?: EncryptedPayload
+
+  // Métricas de prompting (análisis local de calidad de prompts)
+  prompting?: PromptingMetrics
+
+  // Métricas de workflow (orquestación: skills, @refs, flujos)
+  workflow?: WorkflowMetrics
 
   // Para otros collectors
   hasAiFeatures?: boolean
