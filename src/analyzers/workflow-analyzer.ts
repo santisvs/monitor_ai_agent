@@ -62,9 +62,12 @@ function getUserTexts(messages: SessionMessage[]): string[] {
  */
 export function detectSkills(userMessage: string): string[] {
   const skills: string[] = []
-  const slashMatches = userMessage.match(/^\/([\w:-]+)/gm)
-  if (slashMatches) {
-    skills.push(...slashMatches.map(m => m.slice(1)))
+  // Solo detecta slash commands reales: deben contener guion o dos puntos
+  // (executing-plans, superpowers:brainstorming) para evitar capturar rutas
+  // de archivo como /var/log → "var" o /ajax/handler → "ajax"
+  const regex = /^\/([\w][\w:-]*(?:[-:][\w:-]+)+)(?![/\w])/gm
+  for (const m of userMessage.matchAll(regex)) {
+    skills.push(m[1])
   }
   return skills
 }

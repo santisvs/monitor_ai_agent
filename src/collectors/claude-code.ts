@@ -39,6 +39,8 @@ interface SessionAnalysis {
   taskType: TaskType
   /** Mensajes de la sesión (user/assistant) para análisis de prompting */
   messages: SessionMessage[]
+  /** Tiempo de modificación del archivo .jsonl (ms desde epoch) para ordenar por recencia */
+  mtimeMs: number
 }
 
 /**
@@ -162,6 +164,7 @@ export function collectClaudeCode(): CollectorResult {
           // Analizar contenido de la sesión
           const analysis = analyzeSession(sessionPath, sessionId, sessionIndex)
           if (analysis) {
+            analysis.mtimeMs = fileStat.mtimeMs
             sessionAnalyses.push(analysis)
             totalTurns += analysis.turns
 
@@ -238,6 +241,11 @@ export function collectClaudeCode(): CollectorResult {
   }
   metrics.modelsUsed = modelsUsed.sort((a, b) => b.sessions - a.sessions)
   metrics.modelDiversity = modelsUsed.length
+
+  // Ordenar por recencia antes de tomar las últimas 50 sesiones.
+  // El orden de traversal del filesystem (UUID) no es cronológico,
+  // por lo que sin ordenar, sesiones recientes con skills podrían quedar excluidas.
+  sessionAnalyses.sort((a, b) => a.mtimeMs - b.mtimeMs)
 
   // Métricas de prompting (últimas 50 sesiones, análisis local)
   const recentSessions = sessionAnalyses.slice(-50)
@@ -358,21 +366,17 @@ function analyzeSession(
           usesExtendedThinking = true
         }
 
-        // Extraer herramientas usadas
-        if (msg.message?.tool_calls && Array.isArray(msg.message.tool_calls)) {
-          for (const call of msg.message.tool_calls) {
-            if (typeof call === 'object' && call !== null && 'name' in call) {
-              const callAny = call as { name?: unknown; input?: unknown }
-              const callName = typeof callAny.name === 'string' ? callAny.name : ''
-              if (callName) {
-                toolsUsed.add(callName.toLowerCase())
-              }
-
+        // Extraer herramientas usadas desde bloques tool_use en content (formato real de Claude Code JSONL)
+        // Claude Code NO usa msg.message.tool_calls - las tool calls van dentro de msg.message.content
+        if (msg.message?.role === 'assistant' && Array.isArray(msg.message.content)) {
+          for (const block of msg.message.content as Array<{ type?: string; name?: string; input?: unknown }>) {
+            if (block?.type === 'tool_use' && typeof block.name === 'string') {
+              toolsUsed.add(block.name.toLowerCase())
               // Capturar skills invocadas por el asistente (Tool: Skill)
-              if (callName === 'Skill' && callAny.input && typeof callAny.input === 'object') {
-                const inputAny = callAny.input as { skill?: unknown }
-                if (typeof inputAny.skill === 'string' && inputAny.skill.trim().length > 0) {
-                  skillsFromToolCalls.add(inputAny.skill)
+              if (block.name === 'Skill' && block.input && typeof block.input === 'object') {
+                const input = block.input as { skill?: unknown }
+                if (typeof input.skill === 'string' && input.skill.trim().length > 0) {
+                  skillsFromToolCalls.add(input.skill)
                 }
               }
             }
@@ -419,6 +423,7 @@ function analyzeSession(
       firstPrompt,
       taskType,
       messages,
+      mtimeMs: 0, // Se sobreescribe en el caller con fileStat.mtimeMs
     }
   } catch {
     return null
