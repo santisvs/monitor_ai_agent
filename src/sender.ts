@@ -15,7 +15,18 @@ export async function sendMetrics(
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ metrics: results }),
+        body: JSON.stringify({
+          metrics: results.map(r => {
+            const { prompting, workflow, ...metricsOnly } = r.metrics
+            return {
+              tool: r.tool,
+              metrics: metricsOnly,
+              collectedAt: r.collectedAt,
+              ...(prompting && Object.keys(prompting).length > 0 && { prompting }),
+              ...(workflow && Object.keys(workflow).length > 0 && { workflow }),
+            }
+          }),
+        }),
       })
 
       if (response.ok) {
