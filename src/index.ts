@@ -161,6 +161,12 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
       if (result.metrics.prompting?.totalPromptsAnalyzed !== undefined && result.metrics.prompting.totalPromptsAnalyzed > 0) {
         console.log(`    → prompting: ${result.metrics.prompting.totalPromptsAnalyzed} prompts analizados`)
       }
+      if (result.metrics.workflow !== undefined) {
+        const wf = result.metrics.workflow as any
+        console.log(`    → workflow: ${wf.totalSessionsAnalyzed} sesiones (skills: ${wf.uniqueSkillsCount ?? 0}, @refs: ${wf.atReferencesCount ?? 0}, conPlan: ${wf.sessionsWithPlan ?? 0})`)
+      } else {
+        console.log(`    → workflow: sin datos`)
+      }
     } catch (err: unknown) {
       const error = err as Error
       console.error(`  Error en ${name}: ${error.message}`)
@@ -257,7 +263,7 @@ async function status() {
 }
 
 function showHelp() {
-  console.log('Monitor IA Agent v1.1.0')
+  console.log('Monitor IA Agent v1.5.0')
   console.log('')
   console.log('Recolecta métricas de uso de herramientas de IA para tu evaluación personalizada.')
   console.log('')

@@ -11,10 +11,20 @@ import type {
   ModelUsage,
   SessionDetail,
   TaskType,
+  WorkflowMetrics,
 } from '../types.js'
 import { inferTaskType, detectsPlanMode } from '../task-inference.js'
 import { encrypt, isValidEncryptionKey } from '../crypto.js'
 import { loadConfig } from '../config.js'
+import {
+  aggregatePromptingMetrics,
+  analyzeSessionPrompts,
+  type SessionMessage,
+} from '../analyzers/prompt-analyzer.js'
+import {
+  aggregateWorkflowMetrics,
+  analyzeSessionWorkflow,
+} from '../analyzers/workflow-analyzer.js'
 
 /** Key en ItemTable de state.vscdb donde Cursor guarda el chat (formato puede variar entre versiones). */
 const CHATDATA_KEY = 'workbench.panel.aichat.view.aichat.chatdata'
@@ -59,6 +69,7 @@ interface SessionAnalysis {
   summary: string
   firstPrompt: string
   taskType: TaskType
+  messages: SessionMessage[]
 }
 
 function getCursorWorkspaceStorageDir(): string {
@@ -199,17 +210,22 @@ function parseChatDataToSessions(
     let firstPrompt = ''
     let model = 'cursor'
     const toolsUsed: string[] = []
+    const messages: SessionMessage[] = []
 
     for (const bubble of bubbles) {
       const type = bubble?.type
       if (type === 'user' || type === 'ai') {
         turns++
       }
-      if (type === 'user' && !firstPrompt) {
-        firstPrompt = extractUserBubbleText(bubble)
+      if (type === 'user') {
+        const text = extractUserBubbleText(bubble)
+        if (!firstPrompt) firstPrompt = text
+        if (text.trim()) messages.push({ role: 'human', content: text })
       }
-      if (type === 'ai' && bubble?.modelType) {
-        model = bubble.modelType
+      if (type === 'ai') {
+        const text = bubble.text || bubble.rawText || ''
+        if (text.trim()) messages.push({ role: 'assistant', content: text })
+        if (bubble?.modelType) model = bubble.modelType
       }
     }
 
@@ -226,6 +242,7 @@ function parseChatDataToSessions(
       summary,
       firstPrompt,
       taskType,
+      messages,
     })
   }
   return sessions
@@ -431,6 +448,38 @@ async function readChatDataFromStateVscdb(dbPath: string, logKeysIfMissing = fal
   return null
 }
 
+/** Extrae skills (comandos con slash) de aiService.prompts del SQLite de Cursor. */
+async function readSkillsFromAiServicePrompts(dbPath: string): Promise<string[]> {
+  const SQL = await loadSqlJs()
+  if (!SQL) return []
+  try {
+    const buffer = new Uint8Array(fs.readFileSync(dbPath))
+    const db = new SQL.Database(buffer as unknown as BufferSource)
+    const stmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?')
+    stmt.bind(['aiService.prompts'])
+    let result: string[] = []
+    if (stmt.step()) {
+      const row = stmt.getAsObject() as { value?: string }
+      if (typeof row.value === 'string') {
+        try {
+          const prompts = JSON.parse(row.value) as Array<{ text?: string }>
+          const skillRegex = /^\/([\w][\w:-]*(?:[-:][\w:-]+)+)/
+          for (const p of prompts) {
+            if (!p.text) continue
+            const match = p.text.match(skillRegex)
+            if (match) result.push(match[1])
+          }
+        } catch {}
+      }
+    }
+    stmt.free()
+    db.close()
+    return result
+  } catch {
+    return []
+  }
+}
+
 export async function collectCursor(): Promise<CollectorResult> {
   const workspaceStorageDir = getCursorWorkspaceStorageDir()
   const metrics: ExtendedMetrics = {
@@ -586,6 +635,61 @@ export async function collectCursor(): Promise<CollectorResult> {
   }
   metrics.modelsUsed = modelsUsed.sort((a, b) => b.sessions - a.sessions)
   metrics.modelDiversity = modelsUsed.length
+
+  // Prompting y workflow: analizar las 50 sesiones más recientes con mensajes
+  const recentSessions = sessionAnalyses.slice(-50)
+  const sessionsWithMessages = recentSessions.filter(s => s.messages.length > 0)
+  if (sessionsWithMessages.length > 0) {
+    const promptingData = sessionsWithMessages.map(s => analyzeSessionPrompts(s.messages))
+    metrics.prompting = aggregatePromptingMetrics(promptingData)
+    const workflowData = sessionsWithMessages.map(s => analyzeSessionWorkflow(s.messages, []))
+    metrics.workflow = aggregateWorkflowMetrics(workflowData)
+  }
+
+  // Extraer skills de aiService.prompts (contiene el texto completo con el slash command)
+  // Los bubbles de composer.composerData pierden el prefijo, pero aiService.prompts lo conserva
+  const allSkillsFromPrompts: string[] = []
+  for (const { path: dbPath } of workspaceEntries.slice(0, 10)) {
+    const skills = await readSkillsFromAiServicePrompts(dbPath)
+    for (const s of skills) allSkillsFromPrompts.push(s)
+  }
+  if (allSkillsFromPrompts.length > 0) {
+    if (!metrics.workflow) {
+      metrics.workflow = {
+        skillsUsed: [],
+        skillUsageCount: 0,
+        uniqueSkillsCount: 0,
+        skillsPerSession: 0,
+        atReferencesCount: 0,
+        atReferencesPerSession: 0,
+        uniqueFilesReferenced: 0,
+        usesPlanFiles: false,
+        usesConfigFiles: false,
+        pathsInPrompts: 0,
+        sessionsWithPlan: 0,
+        sessionsWithVerification: 0,
+        sessionsWithReview: 0,
+        fullFlowSessions: 0,
+        avgActionsPerSession: 0,
+        definesProcess: false,
+        setsConstraints: false,
+        requestsVerification: false,
+        definesAcceptanceCriteria: false,
+        directiveRate: 0,
+        totalSessionsAnalyzed: sessionAnalyses.length,
+        analysisVersion: '1.0',
+      }
+    }
+    // Merge: añadir skills encontrados en aiService.prompts a los ya detectados
+    const existingSkills = new Set(metrics.workflow.skillsUsed)
+    for (const skill of allSkillsFromPrompts) existingSkills.add(skill)
+    metrics.workflow.skillsUsed = Array.from(existingSkills)
+    metrics.workflow.skillUsageCount = Math.max(metrics.workflow.skillUsageCount, allSkillsFromPrompts.length)
+    metrics.workflow.uniqueSkillsCount = metrics.workflow.skillsUsed.length
+    if (sessionAnalyses.length > 0) {
+      metrics.workflow.skillsPerSession = Math.round((allSkillsFromPrompts.length / sessionAnalyses.length) * 100) / 100
+    }
+  }
 
   if (isValidEncryptionKey(encryptionKey) && sessionAnalyses.length > 0) {
     const sessionDetails: SessionDetail[] = sessionAnalyses.map(s => ({
