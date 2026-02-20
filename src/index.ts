@@ -176,14 +176,29 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
   return results
 }
 
+const MIN_HOURS_BETWEEN_SENDS = 15
+
 async function runOnce() {
   const config = loadConfig()
+
+  // Guard: mínimo 15h entre envíos para evitar dobles envíos por reinicios rápidos
+  if (config.lastSentAt) {
+    const hoursSinceLast = (Date.now() - new Date(config.lastSentAt).getTime()) / 3600000
+    if (hoursSinceLast < MIN_HOURS_BETWEEN_SENDS) {
+      console.log(`[Monitor IA] Guard activo: último envío hace ${hoursSinceLast.toFixed(1)}h. Mínimo ${MIN_HOURS_BETWEEN_SENDS}h entre envíos.`)
+      return
+    }
+  }
+
   console.log(`[${new Date().toLocaleString()}] Ejecutando recolección...`)
   const results = await runCollectors(config.enabledCollectors)
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
     await sendMetrics(config.serverUrl, config.authToken, results)
+    // Guardar timestamp de envío exitoso
+    config.lastSentAt = new Date().toISOString()
+    saveConfig(config)
   }
 }
 

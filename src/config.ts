@@ -14,6 +14,8 @@ export interface AgentConfig {
   encryptionKey?: string
   /** Fecha en que se dio consentimiento (ISO string) */
   consentGivenAt?: string
+  /** Fecha del último envío exitoso de métricas (ISO string) */
+  lastSentAt?: string
 }
 
 export function loadConfig(): AgentConfig {

@@ -74,23 +74,29 @@ export function serviceStatus(): void {
 // === WINDOWS ===
 
 function installWindows(nodePath: string, scriptPath: string, intervalHours: number) {
-  // Remove existing task first
-  try {
-    execSync(`schtasks /Delete /TN "${TASK_NAME}" /F`, { stdio: 'ignore' })
-  } catch {}
+  // Eliminar tareas existentes (periodic y startup)
+  try { execSync(`schtasks /Delete /TN "${TASK_NAME}-periodic" /F`, { stdio: 'ignore' }) } catch {}
+  try { execSync(`schtasks /Delete /TN "${TASK_NAME}-startup" /F`, { stdio: 'ignore' }) } catch {}
+  // Compatibilidad con instalaciones anteriores que usaban el nombre sin sufijo
+  try { execSync(`schtasks /Delete /TN "${TASK_NAME}" /F`, { stdio: 'ignore' }) } catch {}
 
   const intervalMinutes = intervalHours * 60
   // Si nodePath está vacío, scriptPath es un ejecutable standalone
   const taskCommand = nodePath
     ? `\\"${nodePath}\\" \\"${scriptPath}\\" run-once`
     : `\\"${scriptPath}\\" run-once`
-  const cmd = `schtasks /Create /TN "${TASK_NAME}" /TR "${taskCommand}" /SC MINUTE /MO ${intervalMinutes} /F`
+
+  // Tarea periódica (cada N horas)
+  const cmdPeriodic = `schtasks /Create /TN "${TASK_NAME}-periodic" /TR "${taskCommand}" /SC MINUTE /MO ${intervalMinutes} /F`
+  // Tarea de startup (al iniciar sesión)
+  const cmdStartup = `schtasks /Create /TN "${TASK_NAME}-startup" /TR "${taskCommand}" /SC ONLOGON /F`
 
   try {
-    execSync(cmd, { stdio: 'ignore' })
+    execSync(cmdPeriodic, { stdio: 'ignore' })
+    execSync(cmdStartup, { stdio: 'ignore' })
     console.log('Servicio instalado correctamente (Task Scheduler)')
-    console.log(`  Tarea: ${TASK_NAME}`)
-    console.log(`  Intervalo: cada ${intervalHours}h`)
+    console.log(`  Tarea periódica: ${TASK_NAME}-periodic (cada ${intervalHours}h)`)
+    console.log(`  Tarea de inicio: ${TASK_NAME}-startup (al iniciar sesión)`)
     console.log(`  Comando: ${nodePath ? 'node ' + scriptPath : scriptPath} run-once`)
     console.log('\nPara verificar: monitor-ia-agent service status')
     console.log('Para desinstalar: monitor-ia-agent service uninstall')
@@ -102,28 +108,40 @@ function installWindows(nodePath: string, scriptPath: string, intervalHours: num
 }
 
 function uninstallWindows() {
-  try {
-    execSync(`schtasks /Delete /TN "${TASK_NAME}" /F`, { stdio: 'ignore' })
-    console.log(`Tarea "${TASK_NAME}" eliminada correctamente.`)
-  } catch {
-    console.log(`No se encontró la tarea "${TASK_NAME}".`)
+  let found = false
+  for (const suffix of ['-periodic', '-startup', '']) {
+    try {
+      execSync(`schtasks /Delete /TN "${TASK_NAME}${suffix}" /F`, { stdio: 'ignore' })
+      console.log(`Tarea "${TASK_NAME}${suffix}" eliminada correctamente.`)
+      found = true
+    } catch {}
+  }
+  if (!found) {
+    console.log(`No se encontraron tareas de "${TASK_NAME}".`)
   }
 }
 
 function statusWindows() {
-  try {
-    const output = execSync(`schtasks /Query /TN "${TASK_NAME}" /FO LIST /V`, { encoding: 'utf-8' })
-    const statusMatch = output.match(/Status:\s*(.+)/i) || output.match(/Estado:\s*(.+)/i)
-    const lastRunMatch = output.match(/Last Run Time:\s*(.+)/i) || output.match(/Última vez que se ejecutó:\s*(.+)/i)
-    const nextRunMatch = output.match(/Next Run Time:\s*(.+)/i) || output.match(/Próxima ejecución:\s*(.+)/i)
+  let anyFound = false
+  for (const suffix of ['-periodic', '-startup']) {
+    try {
+      const output = execSync(`schtasks /Query /TN "${TASK_NAME}${suffix}" /FO LIST /V`, { encoding: 'utf-8' })
+      const statusMatch = output.match(/Status:\s*(.+)/i) || output.match(/Estado:\s*(.+)/i)
+      const lastRunMatch = output.match(/Last Run Time:\s*(.+)/i) || output.match(/Última vez que se ejecutó:\s*(.+)/i)
+      const nextRunMatch = output.match(/Next Run Time:\s*(.+)/i) || output.match(/Próxima ejecución:\s*(.+)/i)
 
-    console.log(`Servicio: ${TASK_NAME}`)
-    console.log(`  Estado: ${statusMatch ? statusMatch[1].trim() : 'desconocido'}`)
-    console.log(`  Última ejecución: ${lastRunMatch ? lastRunMatch[1].trim() : 'nunca'}`)
-    console.log(`  Próxima ejecución: ${nextRunMatch ? nextRunMatch[1].trim() : 'desconocida'}`)
-  } catch {
+      console.log(`Tarea: ${TASK_NAME}${suffix}`)
+      console.log(`  Estado: ${statusMatch ? statusMatch[1].trim() : 'desconocido'}`)
+      console.log(`  Última ejecución: ${lastRunMatch ? lastRunMatch[1].trim() : 'nunca'}`)
+      if (suffix === '-periodic') {
+        console.log(`  Próxima ejecución: ${nextRunMatch ? nextRunMatch[1].trim() : 'desconocida'}`)
+      }
+      anyFound = true
+    } catch {}
+  }
+  if (!anyFound) {
     console.log(`Servicio "${TASK_NAME}" no instalado.`)
-    console.log('Instálalo con: npx tsx src/index.ts service install')
+    console.log('Instálalo con: monitor-ia-agent service install')
   }
 }
 
@@ -131,20 +149,24 @@ function statusWindows() {
 
 function installLinux(nodePath: string, scriptPath: string, intervalHours: number) {
   const execCommand = nodePath ? `${nodePath} ${scriptPath}` : scriptPath
-  const cronLine = `0 */${intervalHours} * * * ${execCommand} run-once >> ${path.join(os.homedir(), '.monitor-ia', 'agent.log')} 2>&1`
+  const logPath = path.join(os.homedir(), '.monitor-ia', 'agent.log')
+  const cronLine = `0 */${intervalHours} * * * ${execCommand} run-once >> ${logPath} 2>&1`
+  const rebootLine = `@reboot ${execCommand} run-once >> ${logPath} 2>&1 # ${TASK_NAME}-startup`
 
   try {
-    // Remove existing entry
+    // Remove existing entries
     let existing = ''
     try {
       existing = execSync('crontab -l 2>/dev/null', { encoding: 'utf-8' })
     } catch {}
     const filtered = existing.split('\n').filter(l => !l.includes(TASK_NAME) && !l.includes('monitor-ia')).join('\n')
-    const newCrontab = (filtered.trim() ? filtered.trim() + '\n' : '') + `# ${TASK_NAME}\n${cronLine}\n`
+    const newCrontab = (filtered.trim() ? filtered.trim() + '\n' : '')
+      + `# ${TASK_NAME}\n${cronLine}\n${rebootLine}\n`
 
     execSync(`echo "${newCrontab}" | crontab -`, { encoding: 'utf-8' })
     console.log('Servicio instalado correctamente (cron)')
-    console.log(`  Intervalo: cada ${intervalHours}h`)
+    console.log(`  Intervalo periódico: cada ${intervalHours}h`)
+    console.log(`  Inicio de sesión: @reboot`)
     console.log(`  Log: ~/.monitor-ia/agent.log`)
     console.log('\nPara verificar: crontab -l')
     console.log('Para desinstalar: monitor-ia-agent service uninstall')
