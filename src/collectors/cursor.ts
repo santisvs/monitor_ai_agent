@@ -580,7 +580,7 @@ export async function collectCursor(): Promise<CollectorResult> {
     }
     workspaceCount++
     if (stat.mtimeMs > latestTime) latestTime = stat.mtimeMs
-    sessionDates.push(stat.mtimeMs)
+    // No añadir sessionDates aquí: se añade una entrada por sesión (tab) más abajo
 
     const chatJson = await readChatDataFromStateVscdb(dbPath, logKeysOnce)
     if (!chatJson) {
@@ -592,6 +592,8 @@ export async function collectCursor(): Promise<CollectorResult> {
     for (const s of sessions) {
       sessionAnalyses.push(s)
       totalTurns += s.turns
+      // Usar el mtime del workspace como fecha de sesión (mejor aproximación disponible)
+      sessionDates.push(mtime)
       for (const t of s.toolsUsed) allToolsUsed.add(t)
       if (detectsPlanMode(s.summary)) usesPlanMode = true
       const modelStats = modelUsageMap.get(s.model) || {
