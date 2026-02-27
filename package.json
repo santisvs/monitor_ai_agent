@@ -1,6 +1,6 @@
 {
   "name": "monitor-ia-agent",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
   "type": "module",
   "bin": {

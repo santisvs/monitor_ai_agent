@@ -59,7 +59,7 @@ async function askForConsent(): Promise<boolean> {
 }
 
 async function setup(token: string, serverUrl?: string, skipConsent = false) {
-  const url = serverUrl || 'http://localhost:3000'
+  const url = serverUrl || 'https://jakite.tech'
 
   // Si ya existe config, preguntar si quiere reconfigurar
   if (configExists()) {
@@ -278,7 +278,7 @@ async function status() {
 }
 
 function showHelp() {
-  console.log('Monitor IA Agent v1.5.0')
+  console.log('Monitor IA Agent v1.6.2')
   console.log('')
   console.log('Recolecta métricas de uso de herramientas de IA para tu evaluación personalizada.')
   console.log('')
