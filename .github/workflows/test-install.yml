@@ -91,10 +91,12 @@ jobs:
       - name: Service install (Linux)
         if: runner.os == 'Linux'
         run: ./releases/monitor-ia-agent-linux service install
+        shell: bash
 
       - name: Service install (macOS)
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service install
+        shell: bash
 
       - name: Service install (Windows)
         if: runner.os == 'Windows'
@@ -104,14 +106,17 @@ jobs:
       - name: Verify crontab entry exists (Linux)
         if: runner.os == 'Linux'
         run: crontab -l | grep -q "monitor-ia"
+        shell: bash
 
       - name: Verify plist file exists (macOS)
         if: runner.os == 'macOS'
         run: test -f ~/Library/LaunchAgents/com.monitor-ia.agent.plist
+        shell: bash
 
       - name: Verify plist is valid XML (macOS)
         if: runner.os == 'macOS'
         run: plutil -lint ~/Library/LaunchAgents/com.monitor-ia.agent.plist
+        shell: bash
 
       - name: Verify scheduled tasks exist (Windows)
         if: runner.os == 'Windows'
@@ -123,10 +128,12 @@ jobs:
       - name: Service status (Linux)
         if: runner.os == 'Linux'
         run: ./releases/monitor-ia-agent-linux service status
+        shell: bash
 
       - name: Service status (macOS)
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service status
+        shell: bash
 
       - name: Service status (Windows)
         if: runner.os == 'Windows'
@@ -136,10 +143,12 @@ jobs:
       - name: Service uninstall (Linux)
         if: runner.os == 'Linux'
         run: ./releases/monitor-ia-agent-linux service uninstall
+        shell: bash
 
       - name: Service uninstall (macOS)
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service uninstall
+        shell: bash
 
       - name: Service uninstall (Windows)
         if: runner.os == 'Windows'
@@ -154,6 +163,7 @@ jobs:
             exit 1
           fi
           echo "OK: crontab cleaned up"
+        shell: bash
 
       - name: Verify plist removed (macOS)
         if: runner.os == 'macOS'
@@ -163,6 +173,7 @@ jobs:
             exit 1
           fi
           echo "OK: plist removed"
+        shell: bash
 
       - name: Verify scheduled tasks removed (Windows)
         if: runner.os == 'Windows'
