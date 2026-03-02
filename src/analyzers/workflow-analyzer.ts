@@ -62,10 +62,9 @@ function getUserTexts(messages: SessionMessage[]): string[] {
  */
 export function detectSkills(userMessage: string): string[] {
   const skills: string[] = []
-  // Solo detecta slash commands reales: deben contener guion o dos puntos
-  // (executing-plans, superpowers:brainstorming) para evitar capturar rutas
-  // de archivo como /var/log → "var" o /ajax/handler → "ajax"
-  const regex = /^\/([\w][\w:-]*(?:[-:][\w:-]+)+)(?![/\w])/gm
+  // Detecta slash commands al inicio de línea. El lookahead (?![/\w]) evita
+  // capturar rutas como /var/log (el "/" siguiente bloquea el match).
+  const regex = /^\/([\w][\w:-]*)(?![/\w])/gm
   for (const m of userMessage.matchAll(regex)) {
     skills.push(m[1])
   }

@@ -178,8 +178,19 @@ jobs:
       - name: Verify scheduled tasks removed (Windows)
         if: runner.os == 'Windows'
         run: |
-          $result = schtasks /Query /TN "MonitorIA-Agent-periodic" 2>&1
-          if ($LASTEXITCODE -eq 0) { Write-Error "ERROR: task still exists after uninstall"; exit 1 }
+          Write-Host "=== Tasks matching MonitorIA after uninstall ==="
+          schtasks /Query /FO LIST 2>&1 | Select-String "MonitorIA" | ForEach-Object { Write-Host $_ }
+
+          Write-Host "=== Attempting manual schtasks /Delete to diagnose ==="
+          $deleteOut = schtasks /Delete /TN "MonitorIA-Agent-periodic" /F 2>&1
+          Write-Host "Delete periodic exit code: $LASTEXITCODE — output: $deleteOut"
+
+          Write-Host "=== Checking task status ==="
+          schtasks /Query /TN "MonitorIA-Agent-periodic" 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Error "FAILURE: MonitorIA-Agent-periodic still exists after service uninstall (manual delete also failed)"
+            exit 1
+          }
           Write-Host "OK: scheduled tasks cleaned up"
         shell: pwsh
 
