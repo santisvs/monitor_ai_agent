@@ -152,8 +152,12 @@ jobs:
 
       - name: Service uninstall (Windows)
         if: runner.os == 'Windows'
-        run: releases\monitor-ia-agent-win.exe service uninstall
-        shell: cmd
+        run: |
+          $output = releases\monitor-ia-agent-win.exe service uninstall 2>&1
+          Write-Host "=== Uninstall output ==="
+          Write-Host $output
+          Write-Host "Exit code: $LASTEXITCODE"
+        shell: pwsh
 
       - name: Verify crontab cleaned up (Linux)
         if: runner.os == 'Linux'
@@ -178,20 +182,30 @@ jobs:
       - name: Verify scheduled tasks removed (Windows)
         if: runner.os == 'Windows'
         run: |
-          Write-Host "=== Tasks matching MonitorIA after uninstall ==="
-          schtasks /Query /FO LIST 2>&1 | Select-String "MonitorIA" | ForEach-Object { Write-Host $_ }
-
-          Write-Host "=== Attempting manual schtasks /Delete to diagnose ==="
-          $deleteOut = schtasks /Delete /TN "MonitorIA-Agent-periodic" /F 2>&1
-          Write-Host "Delete periodic exit code: $LASTEXITCODE — output: $deleteOut"
-
-          Write-Host "=== Checking task status ==="
+          Write-Host "=== Checking if tasks still exist after service uninstall ==="
           schtasks /Query /TN "MonitorIA-Agent-periodic" 2>&1 | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Error "FAILURE: MonitorIA-Agent-periodic still exists after service uninstall (manual delete also failed)"
+          $periodicExists = $LASTEXITCODE -eq 0
+          schtasks /Query /TN "MonitorIA-Agent-startup" 2>&1 | Out-Null
+          $startupExists = $LASTEXITCODE -eq 0
+
+          if ($periodicExists -or $startupExists) {
+            Write-Host "FAILURE: tasks not cleaned up by service uninstall"
+            if ($periodicExists) { Write-Host "  MonitorIA-Agent-periodic: STILL EXISTS" }
+            if ($startupExists)  { Write-Host "  MonitorIA-Agent-startup: STILL EXISTS" }
+
+            Write-Host "=== Diagnostic: listing all MonitorIA tasks ==="
+            schtasks /Query /FO LIST 2>&1 | Select-String "MonitorIA" | ForEach-Object { Write-Host $_ }
+
+            Write-Host "=== Diagnostic: manual delete attempt ==="
+            $out = schtasks /Delete /TN "MonitorIA-Agent-periodic" /F 2>&1
+            Write-Host "  Exit code: $LASTEXITCODE  Output: $out"
+
+            Write-Host "=== Diagnostic: whoami ==="
+            whoami
+
             exit 1
           }
-          Write-Host "OK: scheduled tasks cleaned up"
+          Write-Host "OK: scheduled tasks cleaned up by service uninstall"
         shell: pwsh
 
   test-unit:
