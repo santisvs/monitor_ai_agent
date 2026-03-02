@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -43,6 +43,10 @@ jobs:
         if: runner.os == 'macOS'
         run: npx pkg bundle/agent.cjs --target node18-macos-x64 --output releases/monitor-ia-agent-macos --compress GZip
 
+      - name: Generate Windows executable
+        if: runner.os == 'Windows'
+        run: npx pkg bundle/agent.cjs --target node18-win-x64 --output releases/monitor-ia-agent-win.exe --compress GZip
+
       - name: Verify executable shows help (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -54,6 +58,20 @@ jobs:
             ./releases/monitor-ia-agent-macos help
           fi
         shell: bash
+
+      - name: Verify executable shows help (Windows)
+        if: runner.os == 'Windows'
+        run: releases\monitor-ia-agent-win.exe help
+        shell: cmd
+
+      - name: Create mock config (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $dir = Join-Path $env:USERPROFILE ".monitor-ia"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $config = '{"serverUrl":"https://test.example.com","authToken":"test-token-ci","syncIntervalHours":6,"enabledCollectors":["claude-code"],"consentGivenAt":"2026-01-01T00:00:00.000Z"}'
+          Set-Content -Path (Join-Path $dir "config.json") -Value $config -Encoding UTF8
+        shell: pwsh
 
       - name: Create mock config (Linux/macOS)
         if: runner.os != 'Windows'
@@ -78,6 +96,11 @@ jobs:
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service install
 
+      - name: Service install (Windows)
+        if: runner.os == 'Windows'
+        run: releases\monitor-ia-agent-win.exe service install
+        shell: cmd
+
       - name: Verify crontab entry exists (Linux)
         if: runner.os == 'Linux'
         run: crontab -l | grep -q "monitor-ia"
@@ -90,6 +113,13 @@ jobs:
         if: runner.os == 'macOS'
         run: plutil -lint ~/Library/LaunchAgents/com.monitor-ia.agent.plist
 
+      - name: Verify scheduled tasks exist (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          schtasks /Query /TN "MonitorIA-Agent-periodic" /FO LIST
+          schtasks /Query /TN "MonitorIA-Agent-startup" /FO LIST
+        shell: cmd
+
       - name: Service status (Linux)
         if: runner.os == 'Linux'
         run: ./releases/monitor-ia-agent-linux service status
@@ -98,6 +128,11 @@ jobs:
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service status
 
+      - name: Service status (Windows)
+        if: runner.os == 'Windows'
+        run: releases\monitor-ia-agent-win.exe service status
+        shell: cmd
+
       - name: Service uninstall (Linux)
         if: runner.os == 'Linux'
         run: ./releases/monitor-ia-agent-linux service uninstall
@@ -105,6 +140,11 @@ jobs:
       - name: Service uninstall (macOS)
         if: runner.os == 'macOS'
         run: ./releases/monitor-ia-agent-macos service uninstall
+
+      - name: Service uninstall (Windows)
+        if: runner.os == 'Windows'
+        run: releases\monitor-ia-agent-win.exe service uninstall
+        shell: cmd
 
       - name: Verify crontab cleaned up (Linux)
         if: runner.os == 'Linux'
@@ -123,6 +163,14 @@ jobs:
             exit 1
           fi
           echo "OK: plist removed"
+
+      - name: Verify scheduled tasks removed (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $result = schtasks /Query /TN "MonitorIA-Agent-periodic" 2>&1
+          if ($LASTEXITCODE -eq 0) { Write-Error "ERROR: task still exists after uninstall"; exit 1 }
+          Write-Host "OK: scheduled tasks cleaned up"
+        shell: pwsh
 
   test-unit:
     name: Unit Tests
