@@ -242,13 +242,13 @@ ${programArgs}
 </plist>`
 
   try {
-    // Unload existing
-    try { execSync(`launchctl unload ${PLIST_PATH}`, { stdio: 'ignore' }) } catch {}
+    // Bootout existing (replaces deprecated launchctl unload, removed in macOS 14+)
+    try { execSync(`launchctl bootout gui/$(id -u)/com.monitor-ia.agent`, { stdio: 'ignore' }) } catch {}
 
     const dir = path.dirname(PLIST_PATH)
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(PLIST_PATH, plist)
-    execSync(`launchctl load ${PLIST_PATH}`)
+    execSync(`launchctl bootstrap gui/$(id -u) ${PLIST_PATH}`)
 
     console.log('Servicio instalado correctamente (launchd)')
     console.log(`  Intervalo: cada ${intervalHours}h`)
@@ -262,7 +262,7 @@ ${programArgs}
 
 function uninstallMac() {
   try {
-    execSync(`launchctl unload ${PLIST_PATH}`, { stdio: 'ignore' })
+    execSync(`launchctl bootout gui/$(id -u)/com.monitor-ia.agent`, { stdio: 'ignore' })
   } catch {}
   if (fs.existsSync(PLIST_PATH)) {
     fs.unlinkSync(PLIST_PATH)
@@ -274,7 +274,7 @@ function uninstallMac() {
 
 function statusMac() {
   try {
-    const output = execSync('launchctl list', { encoding: 'utf-8' })
+    const output = execSync('launchctl print gui/$(id -u)/com.monitor-ia.agent', { encoding: 'utf-8' })
     if (output.includes('com.monitor-ia.agent')) {
       console.log(`Servicio: com.monitor-ia.agent (launchd)`)
       console.log('  Estado: activo')
