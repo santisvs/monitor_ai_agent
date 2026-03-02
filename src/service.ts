@@ -241,28 +241,30 @@ ${programArgs}
 </dict>
 </plist>`
 
+  const uid = os.userInfo().uid
   try {
     // Bootout existing (replaces deprecated launchctl unload, removed in macOS 14+)
-    try { execSync(`launchctl bootout gui/$(id -u)/com.monitor-ia.agent`, { stdio: 'ignore' }) } catch {}
+    try { execSync(`launchctl bootout gui/${uid}/com.monitor-ia.agent`, { stdio: 'ignore' }) } catch {}
 
     const dir = path.dirname(PLIST_PATH)
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(PLIST_PATH, plist)
-    execSync(`launchctl bootstrap gui/$(id -u) ${PLIST_PATH}`)
+    execSync(`launchctl bootstrap gui/${uid} ${PLIST_PATH}`)
 
     console.log('Servicio instalado correctamente (launchd)')
     console.log(`  Intervalo: cada ${intervalHours}h`)
     console.log(`  Log: ~/.monitor-ia/agent.log`)
-    console.log('\nPara verificar: npx tsx src/index.ts service status')
-    console.log('Para desinstalar: npx tsx src/index.ts service uninstall')
+    console.log('\nPara verificar: monitor-ia-agent service status')
+    console.log('Para desinstalar: monitor-ia-agent service uninstall')
   } catch (err: any) {
     console.error('Error al configurar launchd:', err.message)
   }
 }
 
 function uninstallMac() {
+  const uid = os.userInfo().uid
   try {
-    execSync(`launchctl bootout gui/$(id -u)/com.monitor-ia.agent`, { stdio: 'ignore' })
+    execSync(`launchctl bootout gui/${uid}/com.monitor-ia.agent`, { stdio: 'ignore' })
   } catch {}
   if (fs.existsSync(PLIST_PATH)) {
     fs.unlinkSync(PLIST_PATH)
@@ -273,8 +275,9 @@ function uninstallMac() {
 }
 
 function statusMac() {
+  const uid = os.userInfo().uid
   try {
-    const output = execSync('launchctl print gui/$(id -u)/com.monitor-ia.agent', { encoding: 'utf-8' })
+    const output = execSync(`launchctl print gui/${uid}/com.monitor-ia.agent`, { encoding: 'utf-8' })
     if (output.includes('com.monitor-ia.agent')) {
       console.log(`Servicio: com.monitor-ia.agent (launchd)`)
       console.log('  Estado: activo')

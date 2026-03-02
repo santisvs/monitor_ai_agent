@@ -5,10 +5,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('os', async () => {
   const actual = await vi.importActual<typeof import('os')>('os')
   return {
+    ...actual,
     default: {
       ...actual,
       platform: () => 'darwin',
       homedir: () => '/tmp/test-home',
+      userInfo: () => ({ uid: 1234, gid: 1234, username: 'testuser', homedir: '/tmp/test-home', shell: '/bin/zsh' }),
     },
   }
 })
@@ -64,8 +66,9 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
       const calls: string[] = execSync.mock.calls
         .map((args: unknown[]) => String(args[0]))
 
-      const hasBootstrap = calls.some(cmd => cmd.includes('launchctl bootstrap'))
-      expect(hasBootstrap).toBe(true)
+      const bootstrapCall = calls.find(cmd => cmd.includes('launchctl bootstrap'))
+      expect(bootstrapCall).toBeDefined()
+      expect(bootstrapCall).toContain('gui/1234')
     })
 
     it('does NOT call execSync with launchctl load', async () => {
@@ -88,8 +91,9 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
       const calls: string[] = execSync.mock.calls
         .map((args: unknown[]) => String(args[0]))
 
-      const hasBootout = calls.some(cmd => cmd.includes('launchctl bootout'))
-      expect(hasBootout).toBe(true)
+      const bootoutCall = calls.find(cmd => cmd.includes('launchctl bootout'))
+      expect(bootoutCall).toBeDefined()
+      expect(bootoutCall).toContain('gui/1234/com.monitor-ia.agent')
     })
 
     it('does NOT call execSync with launchctl unload', async () => {
