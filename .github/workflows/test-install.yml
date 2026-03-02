@@ -1,0 +1,137 @@
+name: Installation Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Bundle (ESBuild)
+        run: npm run bundle
+
+      - name: Generate Linux executable
+        if: runner.os == 'Linux'
+        run: npx pkg bundle/agent.cjs --target node18-linux-x64 --output releases/monitor-ia-agent-linux --compress GZip
+
+      - name: Generate macOS executable
+        if: runner.os == 'macOS'
+        run: npx pkg bundle/agent.cjs --target node18-macos-x64 --output releases/monitor-ia-agent-macos --compress GZip
+
+      - name: Verify executable shows help (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            chmod +x releases/monitor-ia-agent-linux
+            ./releases/monitor-ia-agent-linux help
+          else
+            chmod +x releases/monitor-ia-agent-macos
+            ./releases/monitor-ia-agent-macos help
+          fi
+        shell: bash
+
+      - name: Create mock config (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p ~/.monitor-ia
+          cat > ~/.monitor-ia/config.json << 'EOF'
+          {
+            "serverUrl": "https://test.example.com",
+            "authToken": "test-token-ci",
+            "syncIntervalHours": 6,
+            "enabledCollectors": ["claude-code"],
+            "consentGivenAt": "2026-01-01T00:00:00.000Z"
+          }
+          EOF
+        shell: bash
+
+      - name: Service install (Linux)
+        if: runner.os == 'Linux'
+        run: ./releases/monitor-ia-agent-linux service install
+
+      - name: Service install (macOS)
+        if: runner.os == 'macOS'
+        run: ./releases/monitor-ia-agent-macos service install
+
+      - name: Verify crontab entry exists (Linux)
+        if: runner.os == 'Linux'
+        run: crontab -l | grep -q "monitor-ia"
+
+      - name: Verify plist file exists (macOS)
+        if: runner.os == 'macOS'
+        run: test -f ~/Library/LaunchAgents/com.monitor-ia.agent.plist
+
+      - name: Verify plist is valid XML (macOS)
+        if: runner.os == 'macOS'
+        run: plutil -lint ~/Library/LaunchAgents/com.monitor-ia.agent.plist
+
+      - name: Service status (Linux)
+        if: runner.os == 'Linux'
+        run: ./releases/monitor-ia-agent-linux service status
+
+      - name: Service status (macOS)
+        if: runner.os == 'macOS'
+        run: ./releases/monitor-ia-agent-macos service status
+
+      - name: Service uninstall (Linux)
+        if: runner.os == 'Linux'
+        run: ./releases/monitor-ia-agent-linux service uninstall
+
+      - name: Service uninstall (macOS)
+        if: runner.os == 'macOS'
+        run: ./releases/monitor-ia-agent-macos service uninstall
+
+      - name: Verify crontab cleaned up (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if crontab -l 2>/dev/null | grep -q "monitor-ia"; then
+            echo "ERROR: crontab entry still present after uninstall"
+            exit 1
+          fi
+          echo "OK: crontab cleaned up"
+
+      - name: Verify plist removed (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if test -f ~/Library/LaunchAgents/com.monitor-ia.agent.plist; then
+            echo "ERROR: plist still exists after uninstall"
+            exit 1
+          fi
+          echo "OK: plist removed"
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - run: npm test
