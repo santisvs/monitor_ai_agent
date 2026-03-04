@@ -312,7 +312,7 @@ async function status() {
 }
 
 function showHelp() {
-  console.log('Monitor IA Agent v1.6.2')
+  console.log('Monitor IA Agent v1.6.3')
   console.log('')
   console.log('Recolecta métricas de uso de herramientas de IA para tu evaluación personalizada.')
   console.log('')
