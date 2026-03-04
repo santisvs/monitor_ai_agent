@@ -178,6 +178,38 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
 
 const MIN_HOURS_BETWEEN_SENDS = 15
 
+async function syncKnowledge(serverUrl: string, token: string): Promise<void> {
+  const tools = ['claude-code', 'cursor', 'github-copilot']
+
+  for (const tool of tools) {
+    try {
+      const response = await fetch(`${serverUrl}/api/knowledge/${tool}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) continue
+
+      const data = await response.json() as {
+        features: { detectionKey: string; isActive: boolean }[]
+        recentChanges: { title: string }[]
+      }
+
+      const config = loadConfig()
+      config.knowledgeCache = config.knowledgeCache ?? {}
+      config.knowledgeCache[tool] = {
+        features: data.features,
+        recentChanges: data.recentChanges,
+        cachedAt: new Date().toISOString(),
+      }
+      saveConfig(config)
+
+      console.log(`[Knowledge] ${tool}: ${data.features.length} features sincronizadas`)
+    }
+    catch (err) {
+      console.warn(`[Knowledge] No se pudo sincronizar ${tool}:`, err)
+    }
+  }
+}
+
 async function runOnce() {
   const config = loadConfig()
 
@@ -199,6 +231,8 @@ async function runOnce() {
     // Guardar timestamp de envío exitoso
     config.lastSentAt = new Date().toISOString()
     saveConfig(config)
+    // Sincronizar knowledge cache (fire-and-forget: no bloquea si falla)
+    await syncKnowledge(config.serverUrl, config.authToken).catch(() => {})
   }
 }
 

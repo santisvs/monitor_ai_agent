@@ -16,6 +16,12 @@ export interface AgentConfig {
   consentGivenAt?: string
   /** Fecha del último envío exitoso de métricas (ISO string) */
   lastSentAt?: string
+  /** Caché local de conocimiento de herramientas (features + changelogs recientes) */
+  knowledgeCache?: Record<string, {
+    features: { detectionKey: string; isActive: boolean }[]
+    recentChanges: { title: string }[]
+    cachedAt: string
+  }>
 }
 
 export function loadConfig(): AgentConfig {
