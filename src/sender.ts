@@ -1,4 +1,12 @@
+import { readFileSync } from 'fs'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import type { CollectorResult } from './types.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const { version: AGENT_VERSION } = JSON.parse(
+  readFileSync(resolve(__dirname, '../package.json'), 'utf-8'),
+) as { version: string }
 
 export async function sendMetrics(
   serverUrl: string,
@@ -16,6 +24,7 @@ export async function sendMetrics(
           'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
+          agentVersion: AGENT_VERSION,
           metrics: results.map(r => {
             const { prompting, workflow, ...metricsOnly } = r.metrics
             return {
