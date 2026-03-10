@@ -312,7 +312,7 @@ async function status() {
 }
 
 function showHelp() {
-  console.log('Monitor IA Agent v1.6.3')
+  console.log('Monitor IA Agent v1.7.0')
   console.log('')
   console.log('Recolecta métricas de uso de herramientas de IA para tu evaluación personalizada.')
   console.log('')
@@ -380,6 +380,28 @@ async function main() {
         console.log('Uso: monitor-ia-agent config interval <horas>')
       }
       break
+    case '--install': {
+      // Modo instalación silenciosa desde el script del instalador
+      // Uso: monitor-ia-agent --install --api-key <key> --server-url <url>
+      const apiKeyIdx = args.indexOf('--api-key')
+      const serverUrlIdx = args.indexOf('--server-url')
+      const apiKey = apiKeyIdx !== -1 ? args[apiKeyIdx + 1] : undefined
+      const serverUrl = serverUrlIdx !== -1 ? args[serverUrlIdx + 1] : undefined
+
+      if (!apiKey) {
+        console.error('[aibl] Error: --api-key es requerido')
+        process.exit(1)
+      }
+
+      console.log('[aibl] Configurando agente...')
+      await setup(apiKey, serverUrl, true) // skipConsent=true: consentimiento dado en el onboarding web
+
+      console.log('[aibl] Instalando servicio del sistema...')
+      serviceInstall()
+
+      console.log('[aibl] ✓ Instalación completada. El agente se ejecutará automáticamente.')
+      break
+    }
     case '--help':
     case '-h':
     case 'help':
