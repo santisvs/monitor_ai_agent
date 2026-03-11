@@ -10,5 +10,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["src/electron/**"]
+  "exclude": ["src/electron/**", "tests/**"]
 }
