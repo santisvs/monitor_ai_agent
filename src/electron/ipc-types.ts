@@ -2,7 +2,6 @@ export interface AgentStatus {
   version: string
   latestVersion: string | null
   apiKeyMasked: string
-  apiKeyFull: string
   lastSentAt: string | null
   nextSendEstimate: string | null
   activities: ActivityItem[]

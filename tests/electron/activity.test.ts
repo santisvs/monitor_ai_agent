@@ -48,5 +48,34 @@ describe('calculateActivityLevel', () => {
     it('percentage is capped at 100', () => {
       expect(calculateActivityLevel(100, history, 'claude-code').percentage).toBeLessThanOrEqual(100)
     })
+
+    it('returns normal at exactly 50% of avg (boundary)', () => {
+      // avg = 10, current = 5 (50%) → normal
+      const history: SendHistoryEntry[] = [
+        { sentAt: '2026-03-10T00:00:00Z', sessions: { 'claude-code': 10 } },
+      ]
+      expect(calculateActivityLevel(5, history, 'claude-code').level).toBe('normal')
+    })
+    it('returns normal at exactly 150% of avg (boundary)', () => {
+      // avg = 10, current = 15 (150%) → normal
+      const history: SendHistoryEntry[] = [
+        { sentAt: '2026-03-10T00:00:00Z', sessions: { 'claude-code': 10 } },
+      ]
+      expect(calculateActivityLevel(15, history, 'claude-code').level).toBe('normal')
+    })
+  })
+
+  describe('aggregate baseline (history, no tool specified)', () => {
+    const history: SendHistoryEntry[] = [
+      { sentAt: '2026-03-10T00:00:00Z', sessions: { 'claude-code': 6, cursor: 4 } },
+      { sentAt: '2026-03-09T00:00:00Z', sessions: { 'claude-code': 4, cursor: 6 } },
+    ]
+    // avg total = 10 per cycle
+    it('returns normal when aggregate sessions match avg', () => {
+      expect(calculateActivityLevel(10, history).level).toBe('normal')
+    })
+    it('returns low when aggregate sessions are below 50% of avg', () => {
+      expect(calculateActivityLevel(4, history).level).toBe('low')
+    })
   })
 })
