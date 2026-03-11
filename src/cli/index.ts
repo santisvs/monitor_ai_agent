@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import readline from 'readline'
-import { loadConfig, saveConfig, configExists, type AgentConfig } from './config.js'
-import { collectClaudeCode } from './collectors/claude-code.js'
-import { collectCursor } from './collectors/cursor.js'
-import { collectVSCodeCopilot } from './collectors/vscode-copilot.js'
-import { sendMetrics } from './sender.js'
-import { serviceInstall, serviceUninstall, serviceStatus } from './service.js'
-import type { CollectorResult } from './types.js'
+import { loadConfig, saveConfig, configExists, type AgentConfig } from '../core/config.js'
+import { collectClaudeCode } from '../core/collectors/claude-code.js'
+import { collectCursor } from '../core/collectors/cursor.js'
+import { collectVSCodeCopilot } from '../core/collectors/vscode-copilot.js'
+import { sendMetrics } from '../core/sender.js'
+import { serviceInstall, serviceUninstall, serviceStatus } from '../core/service.js'
+import type { CollectorResult } from '../core/types.js'
 
 const collectors: Record<string, () => CollectorResult | Promise<CollectorResult>> = {
   'claude-code': collectClaudeCode,
