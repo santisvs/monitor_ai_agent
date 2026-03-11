@@ -10,16 +10,16 @@ type ElectronAPI = {
   getAppVersion: () => Promise<string>
 }
 
-declare const window: Window & { electronAPI: ElectronAPI }
+interface Window { electronAPI: ElectronAPI }
 
 const SCREENS = ['welcome', 'privacy', 'tech', 'installing', 'done'] as const
-type Screen = typeof SCREENS[number]
+type ScreenId = typeof SCREENS[number]
 
-let currentScreen: Screen = 'welcome'
+let currentScreen: ScreenId = 'welcome'
 let setup: { token: string; serverUrl: string } | null = null
 let selectedCollectors: string[] = []
 
-function showScreen(name: Screen) {
+function showScreen(name: ScreenId) {
   document.querySelectorAll<HTMLElement>('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(`screen-${name}`)?.classList.add('active')
   currentScreen = name
