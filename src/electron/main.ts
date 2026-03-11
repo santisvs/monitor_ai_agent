@@ -143,6 +143,16 @@ function createTray(brand: { productName: string }): Tray {
 // IPC handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
+function isTrustedUrl(url: string, brand: ReturnType<typeof loadBrandConfig>): boolean {
+  try {
+    const parsed = new URL(url)
+    const brandUrl = new URL(brand.serverUrl)
+    return parsed.protocol === 'https:' && parsed.origin === brandUrl.origin
+  } catch {
+    return false
+  }
+}
+
 function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   // ── Installer ──────────────────────────────────────────────────────────────
 
@@ -167,6 +177,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   ipcMain.handle(
     'installer:validate-token',
     async (_event, token: string, serverUrl: string): Promise<{ ok: boolean; latestVersion?: string }> => {
+      if (!isTrustedUrl(serverUrl, brand)) return { ok: false }
       try {
         const response = await fetch(`${serverUrl}/api/agent/heartbeat`, {
           method: 'POST',
@@ -183,7 +194,9 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
 
   ipcMain.handle(
     'installer:save-config',
-    async (_event, token: string, serverUrl: string): Promise<void> => {
+    async (_event, token: string, serverUrl: string): Promise<{ ok: boolean }> => {
+      if (!token || typeof token !== 'string' || token.length > 512) return { ok: false }
+      try { const u = new URL(serverUrl); if (u.protocol !== 'https:') return { ok: false } } catch { return { ok: false } }
       const config = {
         serverUrl,
         authToken: token,
@@ -193,6 +206,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
         sendHistory: [] as never[],
       }
       saveConfig(config)
+      return { ok: true }
     },
   )
 
@@ -210,9 +224,10 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
     async (
       _event,
       collectors: string[],
-    ): Promise<{ ok: boolean }> => {
+    ): Promise<{ ok: boolean; error?: string }> => {
       try {
         const config = loadConfig()
+        if (!isTrustedUrl(config.serverUrl, brand)) return { ok: false, error: 'Untrusted server URL' }
         const platform = os.platform()
         const agentVersion = app.getVersion()
 
@@ -228,9 +243,13 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
         if (!response.ok) return { ok: false }
 
         const data = await response.json() as Record<string, unknown>
-        // Merge server response into config (e.g. enabledCollectors, encryptionKey)
-        const updated = { ...config, ...data, enabledCollectors: collectors }
-        saveConfig(updated)
+        // Use explicit allowlist when merging server response into config
+        if (data.ok) {
+          config.enabledCollectors = collectors
+          if (typeof data.syncIntervalHours === 'number') config.syncIntervalHours = data.syncIntervalHours
+          if (typeof data.encryptionKey === 'string') config.encryptionKey = data.encryptionKey
+          await saveConfig(config)
+        }
         return { ok: true }
       } catch {
         return { ok: false }
@@ -253,7 +272,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   ipcMain.handle('installer:create-shortcut', async (): Promise<{ ok: boolean }> => {
     if (process.platform !== 'win32') return { ok: false }
     try {
-      const desktopPath = path.join(os.homedir(), 'Desktop')
+      const desktopPath = app.getPath('desktop')
       const shortcutPath = path.join(desktopPath, `${brand.productName}.lnk`)
       const result = shell.writeShortcutLink(shortcutPath, {
         target: process.execPath,
@@ -269,6 +288,10 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
     if (installerWindow) {
       installerWindow.destroy()
       installerWindow = null
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.destroy()
+      mainWindow = null
     }
     mainWindow = createMainWindow()
     mainWindow.show()
@@ -300,7 +323,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
 
         // Build activities from sendHistory
         const history = config.sendHistory ?? []
-        const allTools = ['claude-code', 'cursor', 'vscode-copilot']
+        const allTools = config.enabledCollectors ?? []
         const toolLabels: Record<string, string> = {
           'claude-code': 'Claude Code',
           'cursor': 'Cursor',
@@ -359,6 +382,11 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // App lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
+
+app.on('before-quit', () => {
+  tray?.destroy()
+  tray = null
+})
 
 app.whenReady().then(() => {
   const brand = loadBrandConfig()

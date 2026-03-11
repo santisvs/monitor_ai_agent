@@ -18,7 +18,7 @@ export async function collectAll(config: AgentConfig): Promise<CollectorResult[]
       // can exclude it from the static bundle if needed.
       // Use Function constructor to prevent TypeScript from statically analysing the import path.
       try {
-        const cursorPath = './collectors/cursor.js'
+        const cursorPath = require('path').join(__dirname, 'collectors', 'cursor.js')
         // eslint-disable-next-line @typescript-eslint/no-implied-eval
         const mod = await (new Function('p', 'return import(p)')(cursorPath)) as { collectCursor: () => Promise<import('./types.js').CollectorResult> }
         results.push(await mod.collectCursor())
