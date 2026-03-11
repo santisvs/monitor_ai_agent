@@ -1,18 +1,10 @@
 #!/usr/bin/env node
 import readline from 'readline'
 import { loadConfig, saveConfig, configExists, updateSendHistory, type AgentConfig } from '../core/config.js'
-import { collectClaudeCode } from '../core/collectors/claude-code.js'
-import { collectCursor } from '../core/collectors/cursor.js'
-import { collectVSCodeCopilot } from '../core/collectors/vscode-copilot.js'
+import { collectAll } from '../core/collector-runner.js'
 import { sendMetrics } from '../core/sender.js'
 import { serviceInstall, serviceUninstall, serviceStatus } from '../core/service.js'
 import type { CollectorResult } from '../core/types.js'
-
-const collectors: Record<string, () => CollectorResult | Promise<CollectorResult>> = {
-  'claude-code': collectClaudeCode,
-  'cursor': collectCursor,
-  'vscode-copilot': collectVSCodeCopilot,
-}
 
 const PRIVACY_NOTICE = `
 ╔══════════════════════════════════════════════════════════════════╗
@@ -88,7 +80,7 @@ async function setup(token: string, serverUrl?: string, skipConsent = false) {
   }
 
   // Fetch config from server (incluye encryptionKey)
-  let enabledCollectors = Object.keys(collectors)
+  let enabledCollectors = ['claude-code', 'cursor', 'vscode-copilot']
   let encryptionKey: string | undefined
 
   try {
@@ -134,42 +126,29 @@ async function setup(token: string, serverUrl?: string, skipConsent = false) {
   console.log('  2. Ejecuta: monitor-ia-agent service install  (para ejecución automática)')
 }
 
-async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
-  const results: CollectorResult[] = []
+async function runCollectors(config: AgentConfig): Promise<CollectorResult[]> {
+  const results = await collectAll(config)
 
-  for (const name of enabled) {
-    const collector = collectors[name]
-    if (!collector) {
-      console.warn(`Collector desconocido: ${name}`)
-      continue
+  for (const result of results) {
+    console.log(`  Recolectando: ${result.tool}...`)
+    // Mostrar resumen breve
+    if (result.metrics.sessionsCount !== undefined) {
+      console.log(`    → ${result.metrics.sessionsCount} sesiones`)
     }
-    try {
-      console.log(`  Recolectando: ${name}...`)
-      const result = await Promise.resolve(collector())
-      results.push(result)
-
-      // Mostrar resumen breve
-      if (result.metrics.sessionsCount !== undefined) {
-        console.log(`    → ${result.metrics.sessionsCount} sesiones`)
-      }
-      if (result.metrics.totalTokens !== undefined && result.metrics.totalTokens > 0) {
-        console.log(`    → ${result.metrics.totalTokens.toLocaleString()} tokens`)
-      }
-      if (result.metrics.encrypted) {
-        console.log(`    → datos sensibles encriptados`)
-      }
-      if (result.metrics.prompting?.totalPromptsAnalyzed !== undefined && result.metrics.prompting.totalPromptsAnalyzed > 0) {
-        console.log(`    → prompting: ${result.metrics.prompting.totalPromptsAnalyzed} prompts analizados`)
-      }
-      if (result.metrics.workflow !== undefined) {
-        const wf = result.metrics.workflow as any
-        console.log(`    → workflow: ${wf.totalSessionsAnalyzed} sesiones (skills: ${wf.uniqueSkillsCount ?? 0}, @refs: ${wf.atReferencesCount ?? 0}, conPlan: ${wf.sessionsWithPlan ?? 0})`)
-      } else {
-        console.log(`    → workflow: sin datos`)
-      }
-    } catch (err: unknown) {
-      const error = err as Error
-      console.error(`  Error en ${name}: ${error.message}`)
+    if (result.metrics.totalTokens !== undefined && result.metrics.totalTokens > 0) {
+      console.log(`    → ${result.metrics.totalTokens.toLocaleString()} tokens`)
+    }
+    if (result.metrics.encrypted) {
+      console.log(`    → datos sensibles encriptados`)
+    }
+    if (result.metrics.prompting?.totalPromptsAnalyzed !== undefined && result.metrics.prompting.totalPromptsAnalyzed > 0) {
+      console.log(`    → prompting: ${result.metrics.prompting.totalPromptsAnalyzed} prompts analizados`)
+    }
+    if (result.metrics.workflow !== undefined) {
+      const wf = result.metrics.workflow as any
+      console.log(`    → workflow: ${wf.totalSessionsAnalyzed} sesiones (skills: ${wf.uniqueSkillsCount ?? 0}, @refs: ${wf.atReferencesCount ?? 0}, conPlan: ${wf.sessionsWithPlan ?? 0})`)
+    } else {
+      console.log(`    → workflow: sin datos`)
     }
   }
 
@@ -242,7 +221,7 @@ async function runOnce() {
   }
 
   console.log(`[${new Date().toLocaleString()}] Ejecutando recolección...`)
-  const results = await runCollectors(config.enabledCollectors)
+  const results = await runCollectors(config)
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
@@ -274,7 +253,7 @@ async function run() {
 
   async function cycle() {
     console.log(`\n[${new Date().toLocaleString()}] Ejecutando recolección...`)
-    const results = await runCollectors(config.enabledCollectors)
+    const results = await runCollectors(config)
     console.log(`  ${results.length} resultados recolectados`)
 
     if (results.length > 0) {
@@ -322,7 +301,7 @@ async function status() {
 
   // Run collectors once to show current data
   console.log('\nDatos actuales:')
-  const results = await runCollectors(config.enabledCollectors)
+  const results = await runCollectors(config)
   for (const r of results) {
     console.log(`\n  ${r.tool}:`)
     for (const [key, value] of Object.entries(r.metrics)) {
