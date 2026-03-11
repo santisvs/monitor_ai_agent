@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import readline from 'readline'
-import { loadConfig, saveConfig, configExists, type AgentConfig } from '../core/config.js'
+import { loadConfig, saveConfig, configExists, updateSendHistory, type AgentConfig } from '../core/config.js'
 import { collectClaudeCode } from '../core/collectors/claude-code.js'
 import { collectCursor } from '../core/collectors/cursor.js'
 import { collectVSCodeCopilot } from '../core/collectors/vscode-copilot.js'
@@ -178,6 +178,25 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
 
 const MIN_HOURS_BETWEEN_SENDS = 15
 
+async function sendHeartbeat(serverUrl: string, token: string): Promise<void> {
+  try {
+    const config = loadConfig()
+    const response = await fetch(`${serverUrl}/api/agent/heartbeat`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (response.ok) {
+      const data = await response.json() as { latestVersion?: string }
+      if (data.latestVersion && data.latestVersion !== config.latestAgentVersion) {
+        config.latestAgentVersion = data.latestVersion
+        saveConfig(config)
+      }
+    }
+  } catch {
+    // heartbeat is best-effort, silently ignore failures
+  }
+}
+
 async function syncKnowledge(serverUrl: string, token: string): Promise<void> {
   const tools = ['claude-code', 'cursor', 'github-copilot']
 
@@ -227,12 +246,21 @@ async function runOnce() {
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
-    await sendMetrics(config.serverUrl, config.authToken, results)
-    // Guardar timestamp de envío exitoso
-    config.lastSentAt = new Date().toISOString()
-    saveConfig(config)
+    const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+    if (sent) {
+      const sessions: Record<string, number> = {}
+      for (const r of results) {
+        const total = (r.metrics as any).totalSessions ?? (r.metrics as any).sessions ?? 0
+        sessions[r.tool] = typeof total === 'number' ? total : 0
+      }
+      config.lastSentAt = new Date().toISOString()
+      config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+      saveConfig(config)
+    }
     // Sincronizar knowledge cache (fire-and-forget: no bloquea si falla)
     await syncKnowledge(config.serverUrl, config.authToken).catch(() => {})
+    // Heartbeat: actualizar latestAgentVersion si el servidor lo provee
+    await sendHeartbeat(config.serverUrl, config.authToken)
   }
 }
 
