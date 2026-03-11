@@ -3,7 +3,7 @@
   "version": "1.7.0",
   "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
   "type": "module",
-  "main": "dist/electron/main.js",
+  "main": "dist/electron/electron/main.js",
   "bin": {
     "monitor-ia-agent": "./dist/cli/index.js"
   },
@@ -19,16 +19,16 @@
     "pkg:all": "npm run bundle && npm run pkg:win && npm run pkg:linux && npm run pkg:mac",
     "release": "npm run pkg:all",
     "electron:clean": "node -e \"const fs=require('fs'); try{fs.rmSync('dist/electron',{recursive:true})}catch(e){}\"",
-    "electron:write-cjs-marker": "node -e \"require('fs').mkdirSync('dist/electron', {recursive:true}); require('fs').writeFileSync('dist/electron/package.json', JSON.stringify({type:'commonjs'}))\"",
+    "electron:write-cjs-marker": "node -e \"require('fs').mkdirSync('dist/electron/electron', {recursive:true}); require('fs').writeFileSync('dist/electron/electron/package.json', JSON.stringify({type:'commonjs'}))\"",
     "electron:compile": "tsc -p tsconfig.electron.json",
     "electron:bundle:installer": "esbuild src/electron/installer/installer.ts --bundle --outfile=dist/electron/installer/installer.js --platform=browser --target=chrome120",
     "electron:bundle:app": "esbuild src/electron/app/app.ts --bundle --outfile=dist/electron/app/app.js --platform=browser --target=chrome120",
     "electron:copy-html": "node -e \"const fs=require('fs');fs.mkdirSync('dist/electron/installer',{recursive:true});fs.mkdirSync('dist/electron/app',{recursive:true});fs.copyFileSync('src/electron/installer/installer.html','dist/electron/installer/installer.html');fs.copyFileSync('src/electron/app/app.html','dist/electron/app/app.html');\"",
     "electron:build": "npm run electron:clean && npm run electron:write-cjs-marker && cross-env BUILD_BRAND=jakite npm run electron:compile && npm run electron:bundle:installer && npm run electron:bundle:app && npm run electron:copy-html",
-    "electron:dev": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron dist/electron/main.js",
-    "electron:pack:win": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --win",
-    "electron:pack:mac": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --mac",
-    "electron:pack:linux": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --linux"
+    "electron:dev": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron dist/electron/electron/main.js",
+    "electron:pack:win": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --win --config electron-builder.config.mjs",
+    "electron:pack:mac": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --mac --config electron-builder.config.mjs",
+    "electron:pack:linux": "npm run electron:build && cross-env BUILD_BRAND=jakite npx electron-builder --linux --config electron-builder.config.mjs"
   },
   "pkg": {
     "assets": [

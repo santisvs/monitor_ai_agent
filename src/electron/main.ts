@@ -24,8 +24,8 @@ function getIconPath(): string {
   const prodIcon = path.join(process.resourcesPath ?? '', 'icons', 'icon.png')
   if (fs.existsSync(prodIcon)) return prodIcon
 
-  // In development, icons live in brands/<brand>/icons/
-  const devIcon = path.join(__dirname, '..', '..', 'brands', brand, 'icons', 'icon.png')
+  // In development, icons live in brands/<brand>/icons/ (3 levels up from dist/electron/electron/)
+  const devIcon = path.join(__dirname, '..', '..', '..', 'brands', brand, 'icons', 'icon.png')
   if (fs.existsSync(devIcon)) return devIcon
 
   // Absolute fallback: same directory as this file (shouldn't happen)
@@ -54,7 +54,7 @@ function createInstallerWindow(): BrowserWindow {
     },
   })
 
-  const htmlPath = path.join(__dirname, 'installer', 'installer.html')
+  const htmlPath = path.join(__dirname, '..', 'installer', 'installer.html')
   win.loadFile(htmlPath)
 
   win.once('ready-to-show', () => win.show())
@@ -74,7 +74,7 @@ function createMainWindow(): BrowserWindow {
     },
   })
 
-  const htmlPath = path.join(__dirname, 'app', 'app.html')
+  const htmlPath = path.join(__dirname, '..', 'app', 'app.html')
   win.loadFile(htmlPath)
 
   win.once('ready-to-show', () => win.show())
@@ -160,7 +160,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
     // Look for agent-setup.json in resourcesPath (production) or resources/ dir (dev)
     const candidates = [
       path.join(process.resourcesPath ?? '', 'agent-setup.json'),
-      path.join(__dirname, '..', '..', 'resources', 'agent-setup.json'),
+      path.join(__dirname, '..', '..', '..', 'resources', 'agent-setup.json'),
     ]
     for (const p of candidates) {
       if (fs.existsSync(p)) {
