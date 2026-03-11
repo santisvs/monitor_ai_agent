@@ -250,7 +250,7 @@ async function runOnce() {
     if (sent) {
       const sessions: Record<string, number> = {}
       for (const r of results) {
-        const total = (r.metrics as any).totalSessions ?? (r.metrics as any).sessions ?? 0
+        const total = (r.metrics as any).sessionsCount ?? 0
         sessions[r.tool] = typeof total === 'number' ? total : 0
       }
       config.lastSentAt = new Date().toISOString()
