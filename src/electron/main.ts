@@ -123,7 +123,7 @@ function createTray(brand: { productName: string }): Tray {
     },
     { type: 'separator' },
     {
-      label: 'Salir',
+      label: 'Cerrar aplicación',
       click: () => {
         // Remove close handler so the window actually closes
         if (mainWindow) {
