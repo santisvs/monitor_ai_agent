@@ -32,7 +32,7 @@ module.exports = {
     icon: `brands/${brand}/icons/icon.png`
   },
   nsis: {
-    oneClick: false,
-    allowToChangeInstallationDirectory: false
+    oneClick: true,
+    perMachine: false
   }
 }

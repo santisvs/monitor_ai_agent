@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/electron/**/*", "src/core/**/*", "src/cli/**/*"],
+  "include": ["src/electron/**/*", "src/core/**/*"],
   "exclude": [
     "node_modules",
     "tests/**",
