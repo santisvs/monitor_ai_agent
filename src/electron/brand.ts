@@ -40,8 +40,8 @@ function resolveBrandPath(brand: string): string {
 }
 
 export function loadBrandConfig(): BrandConfig {
-  const brand = process.env.BUILD_BRAND
-  if (!brand) throw new Error('BUILD_BRAND environment variable is required')
+  // BUILD_BRAND is set at build time; in production the packaged app is always 'jakite'
+  const brand = process.env.BUILD_BRAND ?? 'jakite'
 
   const brandPath = resolveBrandPath(brand)
   const config = JSON.parse(readFileSync(brandPath, 'utf-8')) as BrandConfig
