@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <title>Instalación</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5; color: #1a1a1a;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .screen { display: none; flex-direction: column; flex: 1; padding: 28px 32px; overflow: hidden; }
+    .screen.active { display: flex; }
+    .screen-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .screen-subtitle { font-size: 13px; color: #777; margin-bottom: 16px; }
+    .welcome-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .welcome-logo .app-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #6c63ff, #3ecfcf); border-radius: 10px; }
+    .welcome-logo h1 { font-size: 22px; font-weight: 700; }
+    .welcome-desc { font-size: 14px; color: #555; line-height: 1.7; }
+    .welcome-version { font-size: 12px; color: #aaa; margin-top: 12px; }
+    .privacy-scroll {
+      flex: 1; overflow-y: auto; background: #fff; border: 1px solid #ddd;
+      border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; color: #444;
+    }
+    .privacy-scroll h3 { font-size: 13px; font-weight: 700; margin: 12px 0 4px; color: #222; }
+    .privacy-scroll p { margin-bottom: 8px; }
+    .consent-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; cursor: pointer; }
+    .consent-row input { accent-color: #6c63ff; width: 16px; height: 16px; }
+    .tech-option {
+      display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+      background: #fff; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .tech-option:hover { border-color: #6c63ff; }
+    .tech-option.selected { border-color: #6c63ff; background: #f8f7ff; }
+    .tech-option input[type=checkbox] { accent-color: #6c63ff; width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+    .tech-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .tech-info p { font-size: 12px; color: #888; }
+    .step-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .step-item {
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px;
+      background: #fff; border: 1px solid #eee; border-radius: 8px; font-size: 13px;
+    }
+    .step-icon {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
+    }
+    .step-icon.pending  { background: #f0f0f0; color: #999; }
+    .step-icon.running  { background: #fff3cd; color: #856404; }
+    .step-icon.done     { background: #d1fae5; color: #065f46; }
+    .step-icon.error    { background: #fee2e2; color: #991b1b; }
+    .step-content { flex: 1; }
+    .step-label { font-weight: 500; }
+    .step-error { font-size: 12px; color: #dc2626; margin-top: 3px; }
+    .done-icon { font-size: 56px; text-align: center; margin: 16px 0 12px; }
+    .done-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+    .done-desc { font-size: 14px; color: #666; text-align: center; line-height: 1.6; }
+    .shortcut-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; font-size: 14px; cursor: pointer; }
+    .shortcut-row input { accent-color: #6c63ff; width: 16px; height: 16px; }
+    .footer {
+      display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+      padding: 14px 32px; background: #fff; border-top: 1px solid #e5e5e5; flex-shrink: 0;
+    }
+    .btn { padding: 9px 22px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-primary { background: #6c63ff; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #5b52ee; }
+    .btn-primary:disabled { background: #c7c3f7; cursor: not-allowed; }
+    .btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
+    .btn-secondary:hover { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+
+  <!-- Screen 1: Welcome -->
+  <div class="screen active" id="screen-welcome">
+    <div class="welcome-logo">
+      <div class="app-icon" id="brand-icon"></div>
+      <h1 id="brand-name">Jakite Agent</h1>
+    </div>
+    <p class="welcome-desc">
+      Este asistente te guiará en el proceso de instalación del agente de escritorio.
+      El agente monitoriza tu uso de herramientas de IA y envía métricas anónimas a tu cuenta.
+    </p>
+    <p class="welcome-version">Versión <span id="agent-version">—</span></p>
+  </div>
+
+  <!-- Screen 2: Privacy Policy -->
+  <div class="screen" id="screen-privacy">
+    <p class="screen-title">Política de privacidad</p>
+    <div class="privacy-scroll" id="privacy-scroll">
+      <h3>¿Qué datos recopilamos?</h3>
+      <p>El agente recopila métricas de uso de herramientas de IA instaladas en tu equipo: número de sesiones, tokens consumidos, modelos utilizados, tipos de tareas y tiempo de uso.</p>
+      <h3>¿Qué NO recopilamos?</h3>
+      <p>No accedemos al contenido de tus conversaciones, código fuente, rutas de archivos ni ningún dato personal más allá de las métricas de uso.</p>
+      <h3>Cifrado</h3>
+      <p>Los resúmenes de sesión se cifran localmente con AES-256-GCM antes de ser transmitidos. La clave de cifrado es única para tu instalación y nunca se comparte con terceros.</p>
+      <h3>Retención de datos</h3>
+      <p>Los datos se almacenan en los servidores y se utilizan exclusivamente para generar informes de productividad en tu cuenta personal.</p>
+      <h3>Derechos del usuario</h3>
+      <p>Puedes desinstalar el agente en cualquier momento desde la ventana principal. Al desinstalar, se detendrá completamente la recopilación de datos.</p>
+      <br><br>
+    </div>
+    <label class="consent-row">
+      <input type="checkbox" id="consent-check" disabled>
+      <span>He leído y acepto la política de privacidad</span>
+    </label>
+  </div>
+
+  <!-- Screen 3: Technology Selection -->
+  <div class="screen" id="screen-tech">
+    <p class="screen-title">Selecciona las tecnologías</p>
+    <p class="screen-subtitle">Elige al menos una herramienta a monitorizar:</p>
+    <label class="tech-option selected" id="opt-claude">
+      <input type="checkbox" name="tech" value="claude-code" checked>
+      <div class="tech-info">
+        <h3>Claude Code</h3>
+        <p>Sesiones, tokens consumidos, modelos usados, tipos de tarea detectados</p>
+      </div>
+    </label>
+    <label class="tech-option" id="opt-cursor">
+      <input type="checkbox" name="tech" value="cursor">
+      <div class="tech-info">
+        <h3>Cursor</h3>
+        <p>Sesiones de chat IA, modelos utilizados, actividad del asistente</p>
+      </div>
+    </label>
+    <label class="tech-option" id="opt-copilot">
+      <input type="checkbox" name="tech" value="vscode-copilot">
+      <div class="tech-info">
+        <h3>GitHub Copilot</h3>
+        <p>Detección de instalación y extensiones IA activas en VS Code</p>
+      </div>
+    </label>
+  </div>
+
+  <!-- Screen 4: Installing -->
+  <div class="screen" id="screen-installing">
+    <p class="screen-title">Instalando...</p>
+    <ul class="step-list">
+      <li class="step-item">
+        <div class="step-icon pending" id="icon-validate">1</div>
+        <div class="step-content">
+          <div class="step-label">Validando token con el servidor</div>
+          <div class="step-error" id="error-validate"></div>
+        </div>
+      </li>
+      <li class="step-item">
+        <div class="step-icon pending" id="icon-config">2</div>
+        <div class="step-content">
+          <div class="step-label">Guardando configuración</div>
+          <div class="step-error" id="error-config"></div>
+        </div>
+      </li>
+      <li class="step-item">
+        <div class="step-icon pending" id="icon-service">3</div>
+        <div class="step-content">
+          <div class="step-label">Instalando servicio del sistema</div>
+          <div class="step-error" id="error-service"></div>
+        </div>
+      </li>
+      <li class="step-item">
+        <div class="step-icon pending" id="icon-register">4</div>
+        <div class="step-content">
+          <div class="step-label">Registrando tecnologías en el servidor</div>
+          <div class="step-error" id="error-register"></div>
+        </div>
+      </li>
+      <li class="step-item">
+        <div class="step-icon pending" id="icon-collect">5</div>
+        <div class="step-content">
+          <div class="step-label">Primera captura de datos</div>
+          <div class="step-error" id="error-collect"></div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Screen 5: Done -->
+  <div class="screen" id="screen-done">
+    <div class="done-icon">✅</div>
+    <div class="done-title">¡Instalación completada!</div>
+    <p class="done-desc">El agente está activo y enviará métricas automáticamente según el intervalo configurado.</p>
+    <label class="shortcut-row">
+      <input type="checkbox" id="shortcut-check" checked>
+      <span>Crear acceso directo en el escritorio</span>
+    </label>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <button class="btn btn-secondary" id="btn-back" style="display:none">Atrás</button>
+    <button class="btn btn-primary" id="btn-next">Siguiente</button>
+  </div>
+
+  <script src="installer.js"></script>
+</body>
+</html>

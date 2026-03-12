@@ -4,3 +4,7 @@ bundle
 releases
 .env
 .worktrees/
+dist/electron/
+releases/jakite/
+releases/aibl/
+resources/agent-setup.json

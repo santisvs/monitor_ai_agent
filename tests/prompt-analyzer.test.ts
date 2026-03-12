@@ -3,7 +3,7 @@ import {
   analyzeSessionPrompts,
   aggregatePromptingMetrics,
   type SessionMessage,
-} from '../src/analyzers/prompt-analyzer.js'
+} from '../src/core/analyzers/prompt-analyzer.js'
 
 function sessionWithOnePrompt(content: string): SessionMessage[] {
   return [{ role: 'human', content }]

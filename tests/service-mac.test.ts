@@ -40,7 +40,7 @@ vi.mock('child_process', async () => {
 })
 
 // Mock config module so loadConfig() returns a fake config
-vi.mock('../src/config.js', () => ({
+vi.mock('../src/core/config.js', () => ({
   loadConfig: vi.fn(() => ({
     serverUrl: 'http://localhost:3000',
     authToken: 'test-token',
@@ -60,7 +60,7 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
 
   describe('serviceInstall() on darwin', () => {
     it('calls execSync with launchctl bootstrap', async () => {
-      const { serviceInstall } = await import('../src/service.js')
+      const { serviceInstall } = await import('../src/core/service.js')
       serviceInstall()
 
       const calls: string[] = execSync.mock.calls
@@ -72,7 +72,7 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
     })
 
     it('does NOT call execSync with launchctl load', async () => {
-      const { serviceInstall } = await import('../src/service.js')
+      const { serviceInstall } = await import('../src/core/service.js')
       serviceInstall()
 
       const calls: string[] = execSync.mock.calls
@@ -85,7 +85,7 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
 
   describe('serviceUninstall() on darwin', () => {
     it('calls execSync with launchctl bootout', async () => {
-      const { serviceUninstall } = await import('../src/service.js')
+      const { serviceUninstall } = await import('../src/core/service.js')
       serviceUninstall()
 
       const calls: string[] = execSync.mock.calls
@@ -97,7 +97,7 @@ describe('service macOS (launchctl bootstrap/bootout)', () => {
     })
 
     it('does NOT call execSync with launchctl unload', async () => {
-      const { serviceUninstall } = await import('../src/service.js')
+      const { serviceUninstall } = await import('../src/core/service.js')
       serviceUninstall()
 
       const calls: string[] = execSync.mock.calls

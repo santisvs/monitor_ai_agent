@@ -9,8 +9,8 @@ import {
   analyzeSessionWorkflow,
   aggregateWorkflowMetrics,
   type ToolCall,
-} from '../src/analyzers/workflow-analyzer.js'
-import type { SessionMessage } from '../src/analyzers/prompt-analyzer.js'
+} from '../src/core/analyzers/workflow-analyzer.js'
+import type { SessionMessage } from '../src/core/analyzers/prompt-analyzer.js'
 
 function sessionWithOnePrompt(content: string): SessionMessage[] {
   return [{ role: 'human', content }]

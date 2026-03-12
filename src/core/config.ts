@@ -5,6 +5,11 @@ import os from 'os'
 const CONFIG_DIR = path.join(os.homedir(), '.monitor-ia')
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json')
 
+export interface SendHistoryEntry {
+  sentAt: string
+  sessions: Record<string, number>
+}
+
 export interface AgentConfig {
   serverUrl: string
   authToken: string
@@ -16,6 +21,10 @@ export interface AgentConfig {
   consentGivenAt?: string
   /** Fecha del último envío exitoso de métricas (ISO string) */
   lastSentAt?: string
+  /** Historial de los últimos 5 envíos (herramienta → sesiones) */
+  sendHistory?: SendHistoryEntry[]
+  /** Última versión conocida del agente (desde el servidor) */
+  latestAgentVersion?: string
   /** Caché local de conocimiento de herramientas (features + changelogs recientes) */
   knowledgeCache?: Record<string, {
     features: { detectionKey: string; isActive: boolean }[]
@@ -42,4 +51,13 @@ export function configExists(): boolean {
 
 export function getConfigDir(): string {
   return CONFIG_DIR
+}
+
+export function updateSendHistory(
+  history: SendHistoryEntry[],
+  sentAt: string,
+  sessions: Record<string, number>
+): SendHistoryEntry[] {
+  const updated = [...history, { sentAt, sessions }]
+  return updated.slice(-5)
 }
