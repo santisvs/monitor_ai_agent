@@ -1,12 +1,6 @@
-import { readFileSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
 import type { CollectorResult } from './types.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const { version: AGENT_VERSION } = JSON.parse(
-  readFileSync(resolve(__dirname, '../package.json'), 'utf-8'),
-) as { version: string }
+const AGENT_VERSION = '1.7.0'
 
 export async function sendMetrics(
   serverUrl: string,

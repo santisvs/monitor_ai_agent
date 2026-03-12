@@ -112,7 +112,7 @@ async function setup(token: string, serverUrl?: string, skipConsent = false) {
   const config: AgentConfig = {
     serverUrl: url,
     authToken: token,
-    syncIntervalHours: 6,
+    syncIntervalHours: 15,
     enabledCollectors,
     consentGivenAt: new Date().toISOString(),
   }
@@ -126,7 +126,7 @@ async function setup(token: string, serverUrl?: string, skipConsent = false) {
   console.log('\n✓ Agente configurado correctamente')
   console.log(`  Servidor: ${url}`)
   console.log(`  Collectors: ${enabledCollectors.join(', ')}`)
-  console.log(`  Intervalo: 6 horas`)
+  console.log(`  Intervalo: 15 horas`)
   console.log(`  Encriptación: ${encryptionKey ? 'habilitada' : 'deshabilitada'}`)
   console.log(`  Consentimiento: dado en ${new Date().toLocaleString()}`)
   console.log('\nSiguientes pasos:')
@@ -178,6 +178,32 @@ async function runCollectors(enabled: string[]): Promise<CollectorResult[]> {
 
 const MIN_HOURS_BETWEEN_SENDS = 15
 
+async function sendHeartbeat(serverUrl: string, token: string): Promise<void> {
+  try {
+    await fetch(`${serverUrl}/api/agent/heartbeat`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+  } catch {
+    // Non-fatal: log but don't crash
+    console.warn('[Heartbeat] No se pudo enviar heartbeat al servidor')
+  }
+}
+
+async function checkPendingTrigger(serverUrl: string, token: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${serverUrl}/api/agent/trigger-pending`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) return false
+    const data = await response.json() as { hasPendingTrigger: boolean }
+    return data.hasPendingTrigger === true
+  } catch {
+    return false
+  }
+}
+
 async function syncKnowledge(serverUrl: string, token: string): Promise<void> {
   const tools = ['claude-code', 'cursor', 'github-copilot']
 
@@ -213,13 +239,24 @@ async function syncKnowledge(serverUrl: string, token: string): Promise<void> {
 async function runOnce() {
   const config = loadConfig()
 
+  // Heartbeat: notify server the agent is alive
+  await sendHeartbeat(config.serverUrl, config.authToken)
+
+  // Check for on-demand trigger from aibl onboarding
+  const hasPendingTrigger = await checkPendingTrigger(config.serverUrl, config.authToken)
+
   // Guard: mínimo 15h entre envíos para evitar dobles envíos por reinicios rápidos
-  if (config.lastSentAt) {
+  // Skip guard if triggered on-demand
+  if (!hasPendingTrigger && config.lastSentAt) {
     const hoursSinceLast = (Date.now() - new Date(config.lastSentAt).getTime()) / 3600000
     if (hoursSinceLast < MIN_HOURS_BETWEEN_SENDS) {
       console.log(`[Monitor IA] Guard activo: último envío hace ${hoursSinceLast.toFixed(1)}h. Mínimo ${MIN_HOURS_BETWEEN_SENDS}h entre envíos.`)
       return
     }
+  }
+
+  if (hasPendingTrigger) {
+    console.log('[Monitor IA] Trigger on-demand detectado, ejecutando recolección inmediata...')
   }
 
   console.log(`[${new Date().toLocaleString()}] Ejecutando recolección...`)
@@ -243,6 +280,9 @@ async function run() {
   console.log(`  Intervalo: ${config.syncIntervalHours}h`)
   console.log(`  Collectors: ${config.enabledCollectors.join(', ')}`)
   console.log(`  Encriptación: ${config.encryptionKey ? 'habilitada' : 'deshabilitada'}`)
+
+  // Heartbeat on startup
+  await sendHeartbeat(config.serverUrl, config.authToken)
 
   async function cycle() {
     console.log(`\n[${new Date().toLocaleString()}] Ejecutando recolección...`)

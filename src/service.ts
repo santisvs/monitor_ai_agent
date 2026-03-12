@@ -20,10 +20,29 @@ function getNodePath(): string {
   }
 }
 
+function getPermanentBinaryPath(): string {
+  const ext = platform === 'win32' ? '.exe' : ''
+  return path.join(AGENT_DIR, `monitor-ia-agent${ext}`)
+}
+
+function ensurePermanentBinary(): string {
+  const permanentPath = getPermanentBinaryPath()
+  if (!fs.existsSync(AGENT_DIR)) {
+    fs.mkdirSync(AGENT_DIR, { recursive: true })
+  }
+  if (process.execPath !== permanentPath) {
+    fs.copyFileSync(process.execPath, permanentPath)
+    if (platform !== 'win32') fs.chmodSync(permanentPath, 0o755)
+    console.log(`Agente copiado a: ${permanentPath}`)
+  }
+  return permanentPath
+}
+
 function getExecutablePath(): { exePath: string; needsNode: boolean } {
   if (isPackaged) {
-    // Estamos corriendo como ejecutable empaquetado
-    return { exePath: process.execPath, needsNode: false }
+    // Copiar el binario a ubicación permanente (evita que se borre de %TEMP%)
+    const permanentPath = ensurePermanentBinary()
+    return { exePath: permanentPath, needsNode: false }
   }
   // Estamos corriendo con node
   const scriptPath = path.join(AGENT_DIR, 'dist', 'index.js')
@@ -32,7 +51,7 @@ function getExecutablePath(): { exePath: string; needsNode: boolean } {
 
 export function serviceInstall(): void {
   const config = loadConfig()
-  const intervalHours = config.syncIntervalHours || 6
+  const intervalHours = config.syncIntervalHours || 15
   const { exePath, needsNode } = getExecutablePath()
   const nodePath = needsNode ? getNodePath() : ''
 
@@ -80,16 +99,15 @@ function installWindows(nodePath: string, scriptPath: string, intervalHours: num
   // Compatibilidad con instalaciones anteriores que usaban el nombre sin sufijo
   try { execSync(`schtasks /Delete /TN "${TASK_NAME}" /F`, { stdio: 'ignore' }) } catch {}
 
-  const intervalMinutes = intervalHours * 60
   // Si nodePath está vacío, scriptPath es un ejecutable standalone
   const taskCommand = nodePath
     ? `\\"${nodePath}\\" \\"${scriptPath}\\" run-once`
     : `\\"${scriptPath}\\" run-once`
 
-  // Tarea periódica (cada N horas)
-  const cmdPeriodic = `schtasks /Create /TN "${TASK_NAME}-periodic" /TR "${taskCommand}" /SC MINUTE /MO ${intervalMinutes} /F`
+  // Tarea periódica (cada N horas) — /SC HOURLY no requiere admin; /RL LIMITED = sin elevación
+  const cmdPeriodic = `schtasks /Create /TN "${TASK_NAME}-periodic" /TR "${taskCommand}" /SC HOURLY /MO ${intervalHours} /F /RL LIMITED`
   // Tarea de startup (al iniciar sesión)
-  const cmdStartup = `schtasks /Create /TN "${TASK_NAME}-startup" /TR "${taskCommand}" /SC ONLOGON /F`
+  const cmdStartup = `schtasks /Create /TN "${TASK_NAME}-startup" /TR "${taskCommand}" /SC ONLOGON /F /RL LIMITED`
 
   try {
     execSync(cmdPeriodic, { stdio: 'ignore' })
@@ -97,7 +115,7 @@ function installWindows(nodePath: string, scriptPath: string, intervalHours: num
     console.log('Servicio instalado correctamente (Task Scheduler)')
     console.log(`  Tarea periódica: ${TASK_NAME}-periodic (cada ${intervalHours}h)`)
     console.log(`  Tarea de inicio: ${TASK_NAME}-startup (al iniciar sesión)`)
-    console.log(`  Comando: ${nodePath ? 'node ' + scriptPath : scriptPath} run-once`)
+    console.log(`  Ejecutable: ${scriptPath}`)
     console.log('\nPara verificar: monitor-ia-agent service status')
     console.log('Para desinstalar: monitor-ia-agent service uninstall')
   } catch (err: any) {
