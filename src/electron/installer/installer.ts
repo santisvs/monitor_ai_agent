@@ -41,6 +41,10 @@ function showScreen(name: ScreenId) {
   } else if (name === 'tech') {
     updateTechNextButton()
   } else if (name === 'apikey') {
+    const errorEl = document.getElementById('apikey-error')
+    const validatingEl = document.getElementById('apikey-validating') as HTMLDivElement
+    if (errorEl) errorEl.textContent = ''
+    if (validatingEl) validatingEl.style.display = 'none'
     updateApikeyNextButton()
   } else {
     btnNext.disabled = false

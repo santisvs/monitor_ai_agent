@@ -380,9 +380,9 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
 
   ipcMain.handle('app:open-download', async (_event, version: string): Promise<void> => {
     const platform = process.platform
-    const asset = platform === 'win32' ? 'monitor-ia-agent-win.exe'
-      : platform === 'darwin' ? 'monitor-ia-agent-macos'
-      : 'monitor-ia-agent-linux'
+    const asset = platform === 'win32' ? 'jakite-agent-win.exe'
+      : platform === 'darwin' ? 'jakite-agent-mac.dmg'
+      : 'jakite-agent-linux.AppImage'
     const tag = version.startsWith('v') ? version : `v${version}`
     await shell.openExternal(`https://github.com/santisvs/monitor_ai_agent/releases/download/${tag}/${asset}`)
   })
