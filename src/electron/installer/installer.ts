@@ -1,5 +1,6 @@
 type ElectronAPI = {
   getInstallerSetup: () => Promise<{ token: string; serverUrl: string } | null>
+  getServerUrl: () => Promise<string>
   validateToken: (token: string, serverUrl: string) => Promise<{ ok: boolean; latestVersion: string | null }>
   saveConfig: (token: string, serverUrl: string) => Promise<{ ok: boolean }>
   installService: () => Promise<{ ok: boolean; error?: string }>
@@ -12,7 +13,7 @@ type ElectronAPI = {
 
 interface Window { electronAPI: ElectronAPI }
 
-const SCREENS = ['welcome', 'privacy', 'tech', 'installing', 'done'] as const
+const SCREENS = ['welcome', 'privacy', 'tech', 'apikey', 'installing', 'done'] as const
 type ScreenId = typeof SCREENS[number]
 
 let currentScreen: ScreenId = 'welcome'
@@ -39,6 +40,8 @@ function showScreen(name: ScreenId) {
     btnNext.disabled = !consent.checked
   } else if (name === 'tech') {
     updateTechNextButton()
+  } else if (name === 'apikey') {
+    updateApikeyNextButton()
   } else {
     btnNext.disabled = false
   }
@@ -120,6 +123,12 @@ function updateTechNextButton() {
   if (currentScreen === 'tech') btnNext.disabled = checked.length === 0
 }
 
+function updateApikeyNextButton() {
+  const input = document.getElementById('apikey-input') as HTMLInputElement
+  const btnNext = document.getElementById('btn-next') as HTMLButtonElement
+  if (currentScreen === 'apikey') btnNext.disabled = input.value.trim().length === 0
+}
+
 document.querySelectorAll<HTMLElement>('.tech-option').forEach(opt => {
   opt.addEventListener('change', () => {
     const cb = opt.querySelector<HTMLInputElement>('input[type=checkbox]')
@@ -142,6 +151,12 @@ document.getElementById('consent-check')?.addEventListener('change', function ()
   if (currentScreen === 'privacy') btnNext.disabled = !(this as HTMLInputElement).checked
 })
 
+document.getElementById('apikey-input')?.addEventListener('input', () => {
+  updateApikeyNextButton()
+  const errorEl = document.getElementById('apikey-error')
+  if (errorEl) errorEl.textContent = ''
+})
+
 document.getElementById('btn-next')?.addEventListener('click', () => {
   void (async () => {
     const idx = SCREENS.indexOf(currentScreen)
@@ -150,7 +165,38 @@ document.getElementById('btn-next')?.addEventListener('click', () => {
       selectedCollectors = Array.from(
         document.querySelectorAll<HTMLInputElement>('input[name=tech]:checked')
       ).map(c => c.value)
-      await runInstallation()
+      showScreen('apikey')
+      return
+    }
+
+    if (currentScreen === 'apikey') {
+      const input = document.getElementById('apikey-input') as HTMLInputElement
+      const errorEl = document.getElementById('apikey-error') as HTMLDivElement
+      const validatingEl = document.getElementById('apikey-validating') as HTMLDivElement
+      const token = input.value.trim()
+      if (!token) return
+
+      const btnNext = document.getElementById('btn-next') as HTMLButtonElement
+      btnNext.disabled = true
+      validatingEl.style.display = 'block'
+      errorEl.textContent = ''
+
+      try {
+        const serverUrl = await window.electronAPI.getServerUrl()
+        const validation = await window.electronAPI.validateToken(token, serverUrl)
+        if (!validation.ok) {
+          errorEl.textContent = 'API Key inválida o servidor no disponible. Verifica la clave e inténtalo de nuevo.'
+          btnNext.disabled = false
+          validatingEl.style.display = 'none'
+          return
+        }
+        setup = { token, serverUrl }
+        await runInstallation()
+      } catch {
+        errorEl.textContent = 'Error de conexión. Verifica tu conexión a internet.'
+        btnNext.disabled = false
+        validatingEl.style.display = 'none'
+      }
       return
     }
 
@@ -172,7 +218,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
 
 window.addEventListener('DOMContentLoaded', () => {
   void (async () => {
-    setup = await window.electronAPI.getInstallerSetup()
     const versionEl = document.getElementById('agent-version')
     if (versionEl) {
       const ver = await window.electronAPI.getAppVersion()
