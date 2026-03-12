@@ -32,6 +32,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('app:uninstall'),
   closeWindow: () =>
     ipcRenderer.invoke('app:close-window'),
-  openDownloadPage: () =>
-    ipcRenderer.invoke('app:open-download'),
+  openDownloadPage: (version: string) =>
+    ipcRenderer.invoke('app:open-download', version),
 })
