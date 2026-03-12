@@ -299,6 +299,8 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
     mainWindow.show()
   })
 
+  ipcMain.handle('installer:get-server-url', (): string => brand.serverUrl)
+
   // ── App ────────────────────────────────────────────────────────────────────
 
   ipcMain.handle('app:get-version', (): string => app.getVersion())
@@ -401,16 +403,7 @@ app.whenReady().then(() => {
   registerIpcHandlers(brand)
   tray = createTray(brand)
 
-  // Show installer if agent-setup.json exists (fresh one-click install),
-  // even if a previous config.json is present (e.g. from old CLI agent).
-  const setupCandidates = [
-    path.join(os.homedir(), '.monitor-ia', 'agent-setup.json'),
-    path.join(process.resourcesPath ?? '', 'agent-setup.json'),
-    path.join(__dirname, '..', '..', '..', 'resources', 'agent-setup.json'),
-  ]
-  const hasFreshSetup = setupCandidates.some(p => fs.existsSync(p))
-
-  if (hasFreshSetup || !configExists()) {
+  if (!configExists()) {
     installerWindow = createInstallerWindow()
   } else {
     mainWindow = createMainWindow()
