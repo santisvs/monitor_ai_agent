@@ -157,8 +157,10 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   // ── Installer ──────────────────────────────────────────────────────────────
 
   ipcMain.handle('installer:get-setup', async (): Promise<InstallerSetup | null> => {
-    // Look for agent-setup.json in resourcesPath (production) or resources/ dir (dev)
+    // Look for agent-setup.json written by the one-click installer script (~/.monitor-ia/),
+    // in resourcesPath (production bundle), or in resources/ dir (dev)
     const candidates = [
+      path.join(os.homedir(), '.monitor-ia', 'agent-setup.json'),
       path.join(process.resourcesPath ?? '', 'agent-setup.json'),
       path.join(__dirname, '..', '..', '..', 'resources', 'agent-setup.json'),
     ]

@@ -6,6 +6,7 @@ const brandConfig = JSON.parse(readFileSync(`./brands/${brand}/brand.json`, 'utf
 export default {
   appId: brandConfig.appId,
   productName: brandConfig.productName,
+  artifactName: 'jakite-agent-${os}.${ext}',
   directories: {
     output: `releases/${brand}`,
     buildResources: `brands/${brand}/icons`

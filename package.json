@@ -1,6 +1,6 @@
 {
   "name": "monitor-ia-agent",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
   "type": "module",
   "main": "dist/electron/electron/main.js",
