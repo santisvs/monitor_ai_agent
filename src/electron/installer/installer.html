@@ -69,6 +69,15 @@
     .btn-primary:disabled { background: #c7c3f7; cursor: not-allowed; }
     .btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
     .btn-secondary:hover { background: #f5f5f5; }
+    .apikey-label { font-size: 13px; color: #555; margin-bottom: 8px; }
+    .apikey-input {
+      width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 6px;
+      font-size: 13px; font-family: monospace; outline: none; transition: border-color 0.15s;
+    }
+    .apikey-input:focus { border-color: #6c63ff; }
+    .apikey-error { font-size: 12px; color: #dc2626; margin-top: 6px; min-height: 18px; }
+    .apikey-hint { font-size: 12px; color: #999; margin-top: 8px; }
+    .apikey-validating { font-size: 12px; color: #6c63ff; margin-top: 6px; display: none; }
   </style>
 </head>
 <body>
@@ -133,6 +142,26 @@
         <p>Detección de instalación y extensiones IA activas en VS Code</p>
       </div>
     </label>
+  </div>
+
+  <!-- Screen 3b: API Key -->
+  <div class="screen" id="screen-apikey">
+    <p class="screen-title">Clave de API</p>
+    <p class="screen-subtitle">
+      Ve a <strong>jakite.tech → Instalar → Plugin de Navegador</strong>, genera una API Key y pégala aquí.
+    </p>
+    <p class="apikey-label">API Key</p>
+    <input
+      type="text"
+      id="apikey-input"
+      class="apikey-input"
+      placeholder="jak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      autocomplete="off"
+      spellcheck="false"
+    >
+    <div class="apikey-error" id="apikey-error"></div>
+    <div class="apikey-validating" id="apikey-validating">Validando...</div>
+    <p class="apikey-hint">La clave comienza normalmente con <code>jak_</code></p>
   </div>
 
   <!-- Screen 4: Installing -->
