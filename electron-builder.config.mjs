@@ -7,6 +7,7 @@ export default {
   appId: brandConfig.appId,
   productName: brandConfig.productName,
   artifactName: 'jakite-agent-${os}.${ext}',
+  publish: 'never',
   directories: {
     output: `releases/${brand}`,
     buildResources: `brands/${brand}/icons`
@@ -31,7 +32,7 @@ export default {
     icon: `brands/${brand}/icons/icon.icns`
   },
   linux: {
-    target: ['AppImage', 'deb'],
+    target: ['AppImage'],
     icon: `brands/${brand}/icons/icon.png`
   },
   nsis: {
