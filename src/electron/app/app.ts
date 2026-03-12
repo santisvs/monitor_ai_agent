@@ -5,7 +5,7 @@ type ElectronAPI = {
   revealApiKey: () => Promise<string>
   uninstall: () => Promise<{ ok: boolean }>
   closeWindow: () => Promise<void>
-  openDownloadPage: () => Promise<void>
+  openDownloadPage: (version: string) => Promise<void>
 }
 
 declare const window: Window & { electronAPI: ElectronAPI }
@@ -39,6 +39,7 @@ async function loadStatus() {
   document.getElementById('version-label')!.textContent = `v${status.version}`
 
   if (status.latestVersion && status.latestVersion !== status.version) {
+    pendingLatestVersion = status.latestVersion
     const banner = document.getElementById('update-banner')!
     banner.style.display = 'flex'
     document.getElementById('latest-version-text')!.textContent = `v${status.latestVersion}`
@@ -72,6 +73,7 @@ async function loadStatus() {
 }
 
 let keyRevealed = false
+let pendingLatestVersion = ''
 document.getElementById('btn-show-key')?.addEventListener('click', () => {
   void (async () => {
     const display = document.getElementById('apikey-display')!
@@ -90,7 +92,7 @@ document.getElementById('btn-show-key')?.addEventListener('click', () => {
 })
 
 document.getElementById('btn-update')?.addEventListener('click', () => {
-  void window.electronAPI.openDownloadPage()
+  void window.electronAPI.openDownloadPage(pendingLatestVersion)
 })
 
 document.getElementById('btn-uninstall')?.addEventListener('click', () => {
