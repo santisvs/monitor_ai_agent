@@ -20,6 +20,10 @@ export default {
     {
       from: `brands/${brand}/icons`,
       to: 'icons'
+    },
+    {
+      from: `brands/${brand}/brand.json`,
+      to: `brands/${brand}/brand.json`
     }
   ],
   win: {
