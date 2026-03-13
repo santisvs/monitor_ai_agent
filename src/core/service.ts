@@ -10,6 +10,8 @@ const platform = os.platform()
 
 // Detecta si estamos corriendo como ejecutable empaquetado con pkg
 const isPackaged = !!(process as unknown as { pkg?: unknown }).pkg
+// Detecta si estamos corriendo dentro del proceso main de Electron
+const isElectron = typeof (process.versions as Record<string, unknown>).electron === 'string'
 
 function getNodePath(): string {
   try {
@@ -44,6 +46,10 @@ function getExecutablePath(): { exePath: string; needsNode: boolean } {
     const permanentPath = ensurePermanentBinary()
     return { exePath: permanentPath, needsNode: false }
   }
+  if (isElectron) {
+    // Electron empaquetado: el exe ya está en una ubicación permanente (AppData/Local/Programs)
+    return { exePath: process.execPath, needsNode: false }
+  }
   // Estamos corriendo con node
   const scriptPath = path.join(AGENT_DIR, 'dist', 'index.js')
   return { exePath: scriptPath, needsNode: true }
@@ -56,9 +62,7 @@ export function serviceInstall(): void {
   const nodePath = needsNode ? getNodePath() : ''
 
   if (needsNode && !fs.existsSync(exePath)) {
-    console.error(`Error: No se encuentra ${exePath}`)
-    console.error('Ejecuta "npm run build" primero.')
-    process.exit(1)
+    throw new Error(`No se encuentra ${exePath}. Ejecuta "npm run build" primero.`)
   }
 
   if (platform === 'win32') {

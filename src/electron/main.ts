@@ -214,6 +214,9 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
 
   ipcMain.handle('installer:install-service', async (): Promise<{ ok: boolean; error?: string }> => {
     try {
+      // Registro en inicio de sesión de Windows/macOS via Electron (entrada en registro/launchd)
+      app.setLoginItemSettings({ openAtLogin: true })
+      // Tarea programada periódica para colección de métricas en background
       serviceInstall()
       return { ok: true }
     } catch (err) {
@@ -397,7 +400,18 @@ app.on('before-quit', () => {
   tray = null
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Modo headless: colección periódica lanzada por Task Scheduler
+  if (process.argv.includes('run-once') || process.argv.includes('--run-once')) {
+    try {
+      const config = loadConfig()
+      const { collectAll } = await import('../core/collector-runner')
+      await collectAll(config)
+    } catch { /* ignore errors in background collection */ }
+    app.quit()
+    return
+  }
+
   const brand = loadBrandConfig()
 
   registerIpcHandlers(brand)
