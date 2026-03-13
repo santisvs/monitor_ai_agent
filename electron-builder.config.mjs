@@ -40,6 +40,7 @@ export default {
   },
   nsis: {
     oneClick: true,
-    perMachine: false
+    perMachine: false,
+    include: 'build/installer.nsh'
   }
 }

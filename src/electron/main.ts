@@ -372,8 +372,13 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   })
 
   ipcMain.handle('app:uninstall', async (): Promise<void> => {
+    // Eliminar tareas de Task Scheduler
     try { serviceUninstall() } catch { /* ignore */ }
-    try { fs.unlinkSync(CONFIG_PATH) } catch { /* ignore */ }
+    // Eliminar entrada de inicio de sesión en registro de Windows / launchd macOS
+    try { app.setLoginItemSettings({ openAtLogin: false }) } catch { /* ignore */ }
+    // Eliminar directorio completo de datos del agente (~/.monitor-ia/)
+    const monitorDir = path.join(os.homedir(), '.monitor-ia')
+    try { fs.rmSync(monitorDir, { recursive: true, force: true }) } catch { /* ignore */ }
     app.quit()
   })
 
