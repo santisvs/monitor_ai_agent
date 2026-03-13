@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 import readline from 'readline'
-import { createRequire } from 'module'
 import { loadConfig, saveConfig, configExists, updateSendHistory, type AgentConfig } from '../core/config.js'
 import { collectAll } from '../core/collector-runner.js'
 import { sendMetrics } from '../core/sender.js'
 import { serviceInstall, serviceUninstall, serviceStatus } from '../core/service.js'
+import { AGENT_VERSION as CLI_VERSION } from '../core/agent-version.js'
 import type { CollectorResult } from '../core/types.js'
-
-const _require = createRequire(import.meta.url)
-const CLI_VERSION: string = (() => {
-  try { return (_require('../../package.json') as { version: string }).version } catch { return '1.0.0' }
-})()
 
 const PRIVACY_NOTICE = `
 ╔══════════════════════════════════════════════════════════════════╗
