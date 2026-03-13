@@ -24,6 +24,10 @@ export default {
     {
       from: `brands/${brand}/brand.json`,
       to: `brands/${brand}/brand.json`
+    },
+    {
+      from: 'node_modules/sql.js/dist/sql-wasm.wasm',
+      to: 'sql-wasm.wasm'
     }
   ],
   win: {

@@ -267,8 +267,12 @@ async function loadSqlJs(): Promise<{ Database: new (data?: BufferSource) => SQL
   // Si estamos en un ejecutable empaquetado, buscar el wasm primero
   // y si no existe, no intentar cargar sql.js (evita crash)
   const exeDir = path.dirname(process.execPath)
+  // process.resourcesPath is set by Electron — extraResources are placed there
+  const resourcesPath = (process as unknown as { resourcesPath?: string }).resourcesPath
   const possiblePaths = [
+    ...(resourcesPath ? [path.join(resourcesPath, 'sql-wasm.wasm')] : []),
     path.join(_cursorDir, 'sql-wasm.wasm'),
+    path.join(exeDir, 'resources', 'sql-wasm.wasm'),
     path.join(exeDir, 'sql-wasm.wasm'),
     path.join(process.cwd(), 'sql-wasm.wasm'),
     path.join(process.cwd(), 'bundle', 'sql-wasm.wasm'),
