@@ -8,6 +8,7 @@ type ElectronAPI = {
   runFirstCollection: () => Promise<{ ok: boolean }>
   createShortcut: () => Promise<{ ok: boolean }>
   finishInstall: () => Promise<void>
+  cancelInstall: () => Promise<void>
   getAppVersion: () => Promise<string>
 }
 
@@ -30,10 +31,13 @@ function showScreen(name: ScreenId) {
 
   const hideBack = name === 'welcome' || name === 'installing' || name === 'done'
   const hideNext = name === 'installing'
+  const hideCancel = name === 'done'
 
   btnBack.style.display = hideBack ? 'none' : 'inline-block'
   btnNext.style.display = hideNext ? 'none' : 'inline-block'
   btnNext.textContent = name === 'done' ? 'Finalizar' : 'Siguiente'
+  const btnCancel = document.getElementById('btn-cancel') as HTMLButtonElement
+  if (btnCancel) btnCancel.style.display = hideCancel ? 'none' : 'inline-block'
 
   if (name === 'privacy') {
     const consent = document.getElementById('consent-check') as HTMLInputElement
@@ -218,6 +222,10 @@ document.getElementById('btn-next')?.addEventListener('click', () => {
 document.getElementById('btn-back')?.addEventListener('click', () => {
   const idx = SCREENS.indexOf(currentScreen)
   if (idx > 0) showScreen(SCREENS[idx - 1])
+})
+
+document.getElementById('btn-cancel')?.addEventListener('click', () => {
+  void window.electronAPI.cancelInstall()
 })
 
 window.addEventListener('DOMContentLoaded', () => {

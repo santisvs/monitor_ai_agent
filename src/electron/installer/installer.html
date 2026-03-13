@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
   <title>Instalación</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,15 +11,20 @@
       background: #f5f5f5; color: #1a1a1a;
       height: 100vh; display: flex; flex-direction: column; overflow: hidden;
     }
-    .screen { display: none; flex-direction: column; flex: 1; padding: 28px 32px; overflow: hidden; }
+    .screen { display: none; flex-direction: column; flex: 1; padding: 36px 40px 24px; overflow: hidden; }
     .screen.active { display: flex; }
     .screen-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .screen-subtitle { font-size: 13px; color: #777; margin-bottom: 16px; }
-    .welcome-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-    .welcome-logo .app-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #6c63ff, #3ecfcf); border-radius: 10px; }
-    .welcome-logo h1 { font-size: 22px; font-weight: 700; }
+
+    /* Welcome screen */
+    .welcome-layout { display: flex; align-items: flex-start; gap: 24px; margin-bottom: 24px; }
+    .welcome-icon { width: 80px; height: 80px; border-radius: 16px; flex-shrink: 0; overflow: hidden; }
+    .welcome-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .welcome-text h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .welcome-text .version { font-size: 12px; color: #aaa; margin-bottom: 16px; }
     .welcome-desc { font-size: 14px; color: #555; line-height: 1.7; }
-    .welcome-version { font-size: 12px; color: #aaa; margin-top: 12px; }
+
+    /* Privacy */
     .privacy-scroll {
       flex: 1; overflow-y: auto; background: #fff; border: 1px solid #ddd;
       border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; color: #444;
@@ -28,6 +33,8 @@
     .privacy-scroll p { margin-bottom: 8px; }
     .consent-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; cursor: pointer; }
     .consent-row input { accent-color: #6c63ff; width: 16px; height: 16px; }
+
+    /* Tech options */
     .tech-option {
       display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
       background: #fff; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; cursor: pointer;
@@ -38,6 +45,8 @@
     .tech-option input[type=checkbox] { accent-color: #6c63ff; width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
     .tech-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
     .tech-info p { font-size: 12px; color: #888; }
+
+    /* Installing steps */
     .step-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
     .step-item {
       display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px;
@@ -54,21 +63,15 @@
     .step-content { flex: 1; }
     .step-label { font-weight: 500; }
     .step-error { font-size: 12px; color: #dc2626; margin-top: 3px; }
+
+    /* Done screen */
     .done-icon { font-size: 56px; text-align: center; margin: 16px 0 12px; }
     .done-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px; }
     .done-desc { font-size: 14px; color: #666; text-align: center; line-height: 1.6; }
     .shortcut-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; font-size: 14px; cursor: pointer; }
     .shortcut-row input { accent-color: #6c63ff; width: 16px; height: 16px; }
-    .footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 10px;
-      padding: 14px 32px; background: #fff; border-top: 1px solid #e5e5e5; flex-shrink: 0;
-    }
-    .btn { padding: 9px 22px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
-    .btn-primary { background: #6c63ff; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #5b52ee; }
-    .btn-primary:disabled { background: #c7c3f7; cursor: not-allowed; }
-    .btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
-    .btn-secondary:hover { background: #f5f5f5; }
+
+    /* API Key */
     .apikey-label { font-size: 13px; color: #555; margin-bottom: 8px; }
     .apikey-input {
       width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 6px;
@@ -78,21 +81,40 @@
     .apikey-error { font-size: 12px; color: #dc2626; margin-top: 6px; min-height: 18px; }
     .apikey-hint { font-size: 12px; color: #999; margin-top: 8px; }
     .apikey-validating { font-size: 12px; color: #6c63ff; margin-top: 6px; display: none; }
+
+    /* Footer */
+    .footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 40px; background: #fff; border-top: 1px solid #e5e5e5; flex-shrink: 0;
+    }
+    .footer-right { display: flex; gap: 10px; }
+    .btn { padding: 9px 22px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-primary { background: #6c63ff; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #5b52ee; }
+    .btn-primary:disabled { background: #c7c3f7; cursor: not-allowed; }
+    .btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
+    .btn-secondary:hover { background: #f5f5f5; }
+    .btn-cancel { background: transparent; color: #999; border: 1px solid #ddd; }
+    .btn-cancel:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
   </style>
 </head>
 <body>
 
   <!-- Screen 1: Welcome -->
   <div class="screen active" id="screen-welcome">
-    <div class="welcome-logo">
-      <div class="app-icon" id="brand-icon"></div>
-      <h1 id="brand-name">Jakite Agent</h1>
+    <div class="welcome-layout">
+      <div class="welcome-icon">
+        <img src="icon.png" alt="Jakite Agent">
+      </div>
+      <div class="welcome-text">
+        <h1 id="brand-name">Jakite Agent</h1>
+        <p class="version">Versión <span id="agent-version">—</span></p>
+      </div>
     </div>
     <p class="welcome-desc">
       Este asistente te guiará en el proceso de instalación del agente de escritorio.
       El agente monitoriza tu uso de herramientas de IA y envía métricas anónimas a tu cuenta.
     </p>
-    <p class="welcome-version">Versión <span id="agent-version">—</span></p>
   </div>
 
   <!-- Screen 2: Privacy Policy -->
@@ -155,13 +177,13 @@
       type="text"
       id="apikey-input"
       class="apikey-input"
-      placeholder="jak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      placeholder="mia-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
       autocomplete="off"
       spellcheck="false"
     >
     <div class="apikey-error" id="apikey-error"></div>
     <div class="apikey-validating" id="apikey-validating">Validando...</div>
-    <p class="apikey-hint">La clave comienza normalmente con <code>jak_</code></p>
+    <p class="apikey-hint">La clave comienza normalmente con <code>mia-</code></p>
   </div>
 
   <!-- Screen 4: Installing -->
@@ -219,8 +241,11 @@
 
   <!-- Footer -->
   <div class="footer">
-    <button class="btn btn-secondary" id="btn-back" style="display:none">Atrás</button>
-    <button class="btn btn-primary" id="btn-next">Siguiente</button>
+    <button class="btn btn-cancel" id="btn-cancel">Cancelar</button>
+    <div class="footer-right">
+      <button class="btn btn-secondary" id="btn-back" style="display:none">Atrás</button>
+      <button class="btn btn-primary" id="btn-next">Siguiente</button>
+    </div>
   </div>
 
   <script src="installer.js"></script>

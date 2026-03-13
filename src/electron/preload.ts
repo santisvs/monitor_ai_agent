@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('installer:create-shortcut'),
   finishInstall: () =>
     ipcRenderer.invoke('installer:finish'),
+  cancelInstall: () =>
+    ipcRenderer.invoke('installer:cancel'),
   getServerUrl: () =>
     ipcRenderer.invoke('installer:get-server-url'),
 

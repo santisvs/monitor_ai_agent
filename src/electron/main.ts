@@ -3,7 +3,8 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { loadBrandConfig } from './brand'
-import { loadConfig, saveConfig, configExists } from '../core/config'
+import { loadConfig, saveConfig, configExists, updateSendHistory } from '../core/config'
+import { sendMetrics } from '../core/sender'
 import { serviceInstall, serviceUninstall } from '../core/service'
 import { calculateActivityLevel } from './activity'
 import type { AgentStatus, ActivityItem, InstallerSetup } from './ipc-types'
@@ -267,7 +268,21 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
       const config = loadConfig()
       // Dynamic import so cursor (sql.js/WASM) is optional at build time
       const { collectAll } = await import('../core/collector-runner')
-      await collectAll(config)
+      const results = await collectAll(config)
+
+      if (results.length > 0) {
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+        if (sent) {
+          const sessions: Record<string, number> = {}
+          for (const r of results) {
+            sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+          }
+          config.lastSentAt = new Date().toISOString()
+          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+          saveConfig(config)
+        }
+      }
+
       return { ok: true }
     } catch {
       return { ok: false }
@@ -287,6 +302,15 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
     } catch {
       return { ok: false }
     }
+  })
+
+  ipcMain.handle('installer:cancel', async (): Promise<void> => {
+    // Undo any partial setup: disable autostart and remove config dir
+    try { app.setLoginItemSettings({ openAtLogin: false }) } catch { /* ignore */ }
+    try { serviceUninstall() } catch { /* ignore */ }
+    const monitorDir = path.join(os.homedir(), '.monitor-ia')
+    try { fs.rmSync(monitorDir, { recursive: true, force: true }) } catch { /* ignore */ }
+    app.quit()
   })
 
   ipcMain.handle('installer:finish', async (): Promise<void> => {
@@ -406,12 +430,38 @@ app.on('before-quit', () => {
 })
 
 app.whenReady().then(async () => {
+  // Remove the default application menu (File, Edit, View, Window, Help)
+  Menu.setApplicationMenu(null)
+
   // Modo headless: colección periódica lanzada por Task Scheduler
   if (process.argv.includes('run-once') || process.argv.includes('--run-once')) {
     try {
       const config = loadConfig()
+
+      // Guard: mínimo 15h entre envíos para evitar dobles envíos por reinicios rápidos
+      if (config.lastSentAt) {
+        const hoursSinceLast = (Date.now() - new Date(config.lastSentAt).getTime()) / 3600000
+        if (hoursSinceLast < 15) {
+          app.quit()
+          return
+        }
+      }
+
       const { collectAll } = await import('../core/collector-runner')
-      await collectAll(config)
+      const results = await collectAll(config)
+
+      if (results.length > 0) {
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+        if (sent) {
+          const sessions: Record<string, number> = {}
+          for (const r of results) {
+            sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+          }
+          config.lastSentAt = new Date().toISOString()
+          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+          saveConfig(config)
+        }
+      }
     } catch { /* ignore errors in background collection */ }
     app.quit()
     return
