@@ -1,7 +1,7 @@
 ; Custom NSIS hooks for Jakite Agent installer/uninstaller
 
-; Matar el proceso antes de instalar (evita el diálogo "app está activa")
-!macro customInstall
+; Matar el proceso en .onInit, ANTES de que CHECK_APP_RUNNING muestre el diálogo
+!macro customInit
   nsExec::ExecToLog 'taskkill /F /IM "Jakite Agent.exe" /T'
   nsExec::ExecToLog 'taskkill /F /IM "jakite agent.exe" /T'
   Sleep 1000
