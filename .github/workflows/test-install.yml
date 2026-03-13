@@ -206,6 +206,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: scheduled tasks cleaned up by service uninstall"
+          exit 0
         shell: pwsh
 
   test-unit:
