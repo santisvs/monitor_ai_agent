@@ -1,11 +1,10 @@
 import type { CollectorResult } from './types.js'
 
-const AGENT_VERSION = '1.7.0'
-
 export async function sendMetrics(
   serverUrl: string,
   authToken: string,
   results: CollectorResult[],
+  agentVersion: string = '1.0.0',
 ): Promise<boolean> {
   const maxRetries = 3
 
@@ -18,7 +17,7 @@ export async function sendMetrics(
           'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
-          agentVersion: AGENT_VERSION,
+          agentVersion,
           metrics: results.map(r => {
             const { prompting, workflow, ...metricsOnly } = r.metrics
             return {

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
   <title>Jakite Agent</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,9 +18,10 @@
       -webkit-app-region: drag;
     }
     .titlebar .app-icon {
-      width: 20px; height: 20px; background: linear-gradient(135deg, #6c63ff, #3ecfcf);
-      border-radius: 4px; flex-shrink: 0; -webkit-app-region: no-drag;
+      width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0;
+      -webkit-app-region: no-drag; overflow: hidden;
     }
+    .titlebar .app-icon img { width: 100%; height: 100%; object-fit: cover; }
     .titlebar .title { flex: 1; font-size: 13px; font-weight: 600; color: #c0c0d0; }
     .titlebar .version { font-size: 11px; color: #444; }
     .body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -83,7 +84,7 @@
 </head>
 <body>
   <div class="titlebar">
-    <div class="app-icon"></div>
+    <div class="app-icon"><img src="icon.png" alt=""></div>
     <span class="title" id="brand-title">Jakite Agent</span>
     <span class="version" id="version-label">v—</span>
   </div>

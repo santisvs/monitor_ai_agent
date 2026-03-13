@@ -48,6 +48,7 @@ function createInstallerWindow(): BrowserWindow {
     height: 540,
     resizable: false,
     show: false,
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -68,6 +69,7 @@ function createMainWindow(): BrowserWindow {
     height: 580,
     resizable: false,
     show: false,
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -269,9 +271,10 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
       // Dynamic import so cursor (sql.js/WASM) is optional at build time
       const { collectAll } = await import('../core/collector-runner')
       const results = await collectAll(config)
+      const agentVersion = app.getVersion()
 
       if (results.length > 0) {
-        const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
         if (sent) {
           const sessions: Record<string, number> = {}
           for (const r of results) {
@@ -449,9 +452,10 @@ app.whenReady().then(async () => {
 
       const { collectAll } = await import('../core/collector-runner')
       const results = await collectAll(config)
+      const agentVersion = app.getVersion()
 
       if (results.length > 0) {
-        const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
         if (sent) {
           const sessions: Record<string, number> = {}
           for (const r of results) {
@@ -462,6 +466,22 @@ app.whenReady().then(async () => {
           saveConfig(config)
         }
       }
+
+      // Heartbeat: update latestAgentVersion so the app can show the update banner
+      try {
+        const hbRes = await fetch(`${config.serverUrl}/api/agent/heartbeat`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.authToken}`, 'Content-Type': 'application/json' },
+          body: '{}',
+        })
+        if (hbRes.ok) {
+          const hbData = await hbRes.json() as { latestVersion?: string }
+          if (hbData.latestVersion && hbData.latestVersion !== config.latestAgentVersion) {
+            config.latestAgentVersion = hbData.latestVersion
+            saveConfig(config)
+          }
+        }
+      } catch { /* heartbeat is best-effort */ }
     } catch { /* ignore errors in background collection */ }
     app.quit()
     return

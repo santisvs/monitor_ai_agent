@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 import readline from 'readline'
+import { createRequire } from 'module'
 import { loadConfig, saveConfig, configExists, updateSendHistory, type AgentConfig } from '../core/config.js'
 import { collectAll } from '../core/collector-runner.js'
 import { sendMetrics } from '../core/sender.js'
 import { serviceInstall, serviceUninstall, serviceStatus } from '../core/service.js'
 import type { CollectorResult } from '../core/types.js'
+
+const _require = createRequire(import.meta.url)
+const CLI_VERSION: string = (() => {
+  try { return (_require('../../package.json') as { version: string }).version } catch { return '1.0.0' }
+})()
 
 const PRIVACY_NOTICE = `
 ╔══════════════════════════════════════════════════════════════════╗
@@ -250,7 +256,7 @@ async function runOnce() {
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
-    const sent = await sendMetrics(config.serverUrl, config.authToken, results)
+    const sent = await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION)
     if (sent) {
       const sessions: Record<string, number> = {}
       for (const r of results) {
@@ -285,7 +291,7 @@ async function run() {
     console.log(`  ${results.length} resultados recolectados`)
 
     if (results.length > 0) {
-      await sendMetrics(config.serverUrl, config.authToken, results)
+      await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION)
     }
   }
 
