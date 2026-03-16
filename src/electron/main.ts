@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } from 'ele
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
+import { execSync } from 'child_process'
 import { loadBrandConfig } from './brand'
 import { loadConfig, saveConfig, configExists, updateSendHistory } from '../core/config'
 import { sendMetrics } from '../core/sender'
@@ -36,6 +37,16 @@ function getIconPath(): string {
 function maskToken(token: string): string {
   if (!token || token.length < 8) return '****'
   return token.slice(0, 4) + '****' + token.slice(-4)
+}
+
+function isServiceInstalled(): boolean {
+  if (os.platform() !== 'win32') return true // Linux/macOS: assume ok (cron/launchd)
+  try {
+    execSync('schtasks /Query /TN "MonitorIA-Agent-startup" /FO LIST', { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -387,6 +398,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
       lastSentAt,
       nextSendEstimate,
       activities,
+      serviceInstalled: isServiceInstalled(),
     }
   })
 
@@ -496,6 +508,31 @@ app.whenReady().then(async () => {
     installerWindow = createInstallerWindow()
   } else {
     mainWindow = createMainWindow()
+    // Auto-collect on startup if metrics are stale (fallback when Task Scheduler is unavailable)
+    void (async () => {
+      try {
+        const config = loadConfig()
+        if (!config.lastSentAt) return
+        const hoursSinceLast = (Date.now() - new Date(config.lastSentAt).getTime()) / 3600000
+        const intervalHours = config.syncIntervalHours ?? 15
+        if (hoursSinceLast < intervalHours) return
+        const { collectAll } = await import('../core/collector-runner')
+        const results = await collectAll(config)
+        const agentVersion = app.getVersion()
+        if (results.length > 0) {
+          const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
+          if (sent) {
+            const sessions: Record<string, number> = {}
+            for (const r of results) {
+              sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+            }
+            config.lastSentAt = new Date().toISOString()
+            config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+            saveConfig(config)
+          }
+        }
+      } catch { /* background collection errors are non-fatal */ }
+    })()
   }
 })
 
