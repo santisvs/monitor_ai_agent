@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -46,9 +47,19 @@ jobs:
         env:
           BUILD_BRAND: jakite
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # Windows code signing — add WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD secrets to enable
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Sign with SignPath (Windows only)
+        if: matrix.os == 'windows-latest'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: jakite-agent
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: initial-version
+          input-artifact-path: releases/jakite/jakite-agent-win.exe
+          output-artifact-path: releases/jakite/jakite-agent-win.exe
+          wait-for-completion: true
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
