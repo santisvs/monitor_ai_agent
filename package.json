@@ -1,6 +1,6 @@
 {
   "name": "monitor-ia-agent",
-  "version": "1.8.11",
+  "version": "1.8.12",
   "description": "Agente de escritorio para Monitor IA - recolecta métricas de herramientas IA locales",
   "author": {
     "name": "Jakite",
