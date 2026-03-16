@@ -83,14 +83,8 @@
     .service-banner {
       background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.35);
       border-radius: 6px; padding: 8px 12px;
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
     .service-text { font-size: 12px; color: #fbbf24; }
-    .btn-repair {
-      font-size: 11px; background: #fbbf24; color: #000;
-      border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 600; white-space: nowrap;
-    }
-    .btn-repair:disabled { opacity: .6; cursor: default; }
   </style>
 </head>
 <body>
@@ -105,8 +99,7 @@
       <button class="btn-update" id="btn-update">Descargar</button>
     </div>
     <div class="service-banner" id="service-banner" style="display:none">
-      <span class="service-text">⚠ El servicio de arranque automático no está instalado</span>
-      <button class="btn-repair" id="btn-repair">Reparar</button>
+      <span class="service-text">⚠ Las tareas del sistema no están instaladas. Los envíos automáticos dependen del arranque de la app.</span>
     </div>
     <div class="apikey-row">
       <span class="apikey-label">API Key</span>

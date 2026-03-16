@@ -6,7 +6,6 @@ type ElectronAPI = {
   uninstall: () => Promise<{ ok: boolean }>
   closeWindow: () => Promise<void>
   openDownloadPage: (version: string) => Promise<void>
-  installService: () => Promise<{ ok: boolean; error?: string }>
 }
 
 declare const window: Window & { electronAPI: ElectronAPI }
@@ -97,24 +96,6 @@ document.getElementById('btn-show-key')?.addEventListener('click', () => {
 
 document.getElementById('btn-update')?.addEventListener('click', () => {
   void window.electronAPI.openDownloadPage(pendingLatestVersion)
-})
-
-document.getElementById('btn-repair')?.addEventListener('click', () => {
-  void (async () => {
-    const btn = document.getElementById('btn-repair') as HTMLButtonElement
-    btn.disabled = true
-    btn.textContent = 'Instalando...'
-    const result = await window.electronAPI.installService()
-    if (result.ok) {
-      document.getElementById('service-banner')!.style.display = 'none'
-    } else {
-      btn.textContent = 'Error'
-      setTimeout(() => {
-        btn.disabled = false
-        btn.textContent = 'Reparar'
-      }, 3000)
-    }
-  })()
 })
 
 document.getElementById('btn-uninstall')?.addEventListener('click', () => {
