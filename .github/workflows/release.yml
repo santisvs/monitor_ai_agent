@@ -46,6 +46,9 @@ jobs:
         env:
           BUILD_BRAND: jakite
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Windows code signing — add WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD secrets to enable
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2

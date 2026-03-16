@@ -32,7 +32,8 @@ export default {
   ],
   win: {
     target: 'nsis',
-    icon: `brands/${brand}/icons/icon.ico`
+    icon: `brands/${brand}/icons/icon.ico`,
+    signingHashAlgorithms: ['sha256'],
   },
   mac: {
     target: 'dmg',
