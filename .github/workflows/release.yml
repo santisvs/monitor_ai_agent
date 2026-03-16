@@ -48,8 +48,17 @@ jobs:
           BUILD_BRAND: jakite
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Upload unsigned artifact for signing (Windows only)
+        if: matrix.os == 'windows-latest'
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakite-agent-win-unsigned
+          path: releases/jakite/jakite-agent-win.exe
+
       - name: Sign with SignPath (Windows only)
         if: matrix.os == 'windows-latest'
+        id: signpath
         uses: signpath/github-action-submit-signing-request@v1
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -57,9 +66,15 @@ jobs:
           project-slug: jakite-agent
           signing-policy-slug: release-signing
           artifact-configuration-slug: initial-version
-          input-artifact-path: releases/jakite/jakite-agent-win.exe
-          output-artifact-path: releases/jakite/jakite-agent-win.exe
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           wait-for-completion: true
+          output-artifact-directory: releases/jakite/signed
+
+      - name: Move signed artifact (Windows only)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Move-Item releases/jakite/signed/jakite-agent-win.exe releases/jakite/jakite-agent-win.exe -Force
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
