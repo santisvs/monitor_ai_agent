@@ -1,0 +1,8 @@
+{"location":"options.ts:loadConfig","message":"Load config executed","data":{"hasCollectorsList":true},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770718118535}
+{"location":"options.ts:renderCollectors","message":"Rendering collectors","data":{"disabledCollectorsCount":0,"toolsCount":6},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770718118535}
+{"location":"options.ts:loadConfig","message":"Load config executed","data":{"hasCollectorsList":true},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770718119819}
+{"location":"options.ts:renderCollectors","message":"Rendering collectors","data":{"disabledCollectorsCount":0,"toolsCount":6},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770718119819}
+{"location":"options.ts:loadConfig","message":"Load config executed","data":{"hasCollectorsList":true},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770723975045}
+{"location":"options.ts:renderCollectors","message":"Rendering collectors","data":{"disabledCollectorsCount":0,"toolsCount":6},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770723975045}
+{"location":"options.ts:loadConfig","message":"Load config executed","data":{"hasCollectorsList":true},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770723987497}
+{"location":"options.ts:renderCollectors","message":"Rendering collectors","data":{"disabledCollectorsCount":0,"toolsCount":6},"runId":"firefox-options-1","hypothesisId":"B","timestamp":1770723987498}

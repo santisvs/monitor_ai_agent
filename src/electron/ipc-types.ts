@@ -5,7 +5,6 @@ export interface AgentStatus {
   lastSentAt: string | null
   nextSendEstimate: string | null
   activities: ActivityItem[]
-  serviceInstalled: boolean
 }
 
 export interface ActivityItem {

@@ -71,8 +71,6 @@ async function loadStatus() {
 
   document.getElementById('next-send-label')!.textContent = formatNextSend(status.nextSendEstimate)
 
-  const serviceBanner = document.getElementById('service-banner')!
-  serviceBanner.style.display = status.serviceInstalled ? 'none' : 'flex'
 }
 
 let keyRevealed = false

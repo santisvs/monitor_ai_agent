@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jakite Agent — Mockup de ventana</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #e0e0e0;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      color: #fff;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 40px;
+    }
+
+    .platforms {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .platform-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .platform-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ─── WINDOWS ─── */
+    .window-windows {
+      width: 360px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      border: 1px solid #3a3a4a;
+      background: #202020;
+    }
+
+    .titlebar-windows {
+      background: #1a1a2e;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      user-select: none;
+    }
+    .titlebar-windows .app-icon {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #6c63ff, #3ecfcf);
+      border-radius: 3px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .titlebar-windows .app-title {
+      font-size: 12px;
+      color: #ccc;
+      flex: 1;
+    }
+    .titlebar-windows .win-controls {
+      display: flex;
+      gap: 0;
+    }
+    .win-btn {
+      width: 46px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #aaa;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .win-btn:hover { background: rgba(255,255,255,0.1); }
+    .win-btn.close:hover { background: #c42b1c; color: #fff; }
+
+    /* ─── MACOS ─── */
+    .window-mac {
+      width: 360px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      border: 1px solid #3a3a3a;
+      background: #2c2c2e;
+    }
+
+    .titlebar-mac {
+      background: #3a3a3c;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+    }
+    .mac-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .mac-dot.close  { background: #ff5f57; }
+    .mac-dot.min    { background: #febc2e; }
+    .mac-dot.max    { background: #28c840; }
+    .titlebar-mac .mac-title {
+      flex: 1;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e0e0e0;
+      margin-left: -54px;
+    }
+
+    /* ─── LINUX ─── */
+    .window-linux {
+      width: 360px;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      border: 1px solid #444;
+      background: #252525;
+    }
+
+    .titlebar-linux {
+      background: #333;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+    }
+    .titlebar-linux .linux-title {
+      flex: 1;
+      font-size: 12px;
+      color: #ddd;
+    }
+    .linux-controls {
+      display: flex;
+      gap: 6px;
+    }
+    .linux-btn {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      cursor: pointer;
+      color: rgba(0,0,0,0.7);
+      font-weight: bold;
+    }
+    .linux-btn.close  { background: #e74c3c; }
+    .linux-btn.min    { background: #f1c40f; }
+    .linux-btn.max    { background: #2ecc71; }
+
+    /* ─── BODY COMPARTIDO ─── */
+    .window-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Update banner */
+    .update-banner {
+      background: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.35);
+      border-radius: 6px;
+      padding: 9px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .update-banner .update-text {
+      font-size: 12px;
+      color: #ffc107;
+    }
+    .update-banner .update-text span {
+      font-weight: 600;
+    }
+    .update-btn {
+      font-size: 11px;
+      background: #ffc107;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Apikey row */
+    .apikey-row {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 9px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .apikey-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .apikey-value {
+      font-size: 12px;
+      color: #b0b0b0;
+      font-family: 'Courier New', monospace;
+      flex: 1;
+      text-align: center;
+    }
+    .show-btn {
+      font-size: 11px;
+      background: transparent;
+      color: #6c63ff;
+      border: 1px solid #6c63ff;
+      border-radius: 4px;
+      padding: 3px 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Last send section */
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+    .last-send-box {
+      background: rgba(108, 99, 255, 0.1);
+      border: 1px solid rgba(108, 99, 255, 0.25);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+    .last-send-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+    .last-send-meta {
+      font-size: 11px;
+      color: #888;
+      margin-top: 3px;
+    }
+
+    /* Activity bars */
+    .activity-section { }
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .activity-item:last-child { margin-bottom: 0; }
+    .activity-name {
+      font-size: 12px;
+      color: #ccc;
+      width: 90px;
+      flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .bar-fill.high   { background: linear-gradient(90deg, #6c63ff, #3ecfcf); }
+    .bar-fill.normal { background: linear-gradient(90deg, #28c840, #20a030); }
+    .bar-fill.low    { background: linear-gradient(90deg, #ffc107, #e0a800); }
+    .bar-fill.none   { background: rgba(255,255,255,0.15); width: 100% !important; }
+    .activity-badge {
+      font-size: 10px;
+      font-weight: 600;
+      width: 64px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .activity-badge.high   { color: #3ecfcf; }
+    .activity-badge.normal { color: #28c840; }
+    .activity-badge.low    { color: #ffc107; }
+    .activity-badge.none   { color: #555; }
+
+    /* Next send */
+    .next-send {
+      font-size: 11px;
+      color: #666;
+      text-align: center;
+    }
+    .next-send span { color: #888; }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+    }
+
+    /* Footer */
+    .window-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 14px;
+    }
+    .btn-uninstall {
+      font-size: 12px;
+      background: transparent;
+      color: #e74c3c;
+      border: 1px solid rgba(231, 76, 60, 0.5);
+      border-radius: 5px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+    .btn-uninstall:hover { background: rgba(231,76,60,0.1); }
+    .btn-close {
+      font-size: 12px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+    .btn-close:hover { background: rgba(255,255,255,0.14); }
+
+    /* Version badge */
+    .version-badge {
+      font-size: 10px;
+      color: #555;
+      text-align: right;
+      padding: 0 16px 4px;
+      margin-top: -10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Jakite Agent — Ventana principal</h1>
+  <p class="subtitle">Mockup de diseño para Windows, macOS y Linux</p>
+
+  <div class="platforms">
+
+    <!-- ══════════ WINDOWS ══════════ -->
+    <div class="platform-wrap">
+      <div class="platform-label">Windows</div>
+      <div class="window-windows">
+        <div class="titlebar-windows">
+          <div class="app-icon"></div>
+          <span class="app-title">Jakite Agent</span>
+          <div class="win-controls">
+            <div class="win-btn">&#8722;</div>
+            <div class="win-btn close">&#10005;</div>
+          </div>
+        </div>
+        <div class="version-badge">v1.7.0</div>
+        <div class="window-body">
+          <!-- Update banner -->
+          <div class="update-banner">
+            <div class="update-text">⚠ Nueva versión disponible: <span>v1.8.0</span></div>
+            <button class="update-btn">Descargar</button>
+          </div>
+
+          <!-- API Key -->
+          <div class="apikey-row">
+            <span class="apikey-label">API Key</span>
+            <span class="apikey-value">abc1••••••••xyz9</span>
+            <button class="show-btn">Mostrar</button>
+          </div>
+
+          <!-- Last send -->
+          <div>
+            <div class="section-label">Último envío</div>
+            <div class="last-send-box">
+              <div class="last-send-date">11 mar 2026 · 09:42:31</div>
+              <div class="last-send-meta">3 herramientas · 47 sesiones enviadas</div>
+            </div>
+          </div>
+
+          <!-- Activity -->
+          <div class="activity-section">
+            <div class="section-label">Actividad desde el último envío</div>
+            <div class="activity-item">
+              <span class="activity-name">Claude Code</span>
+              <div class="bar-track"><div class="bar-fill high" style="width:82%"></div></div>
+              <span class="activity-badge high">Alta</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Cursor</span>
+              <div class="bar-track"><div class="bar-fill low" style="width:28%"></div></div>
+              <span class="activity-badge low">Poca</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Copilot</span>
+              <div class="bar-track"><div class="bar-fill none"></div></div>
+              <span class="activity-badge none">Sin datos</span>
+            </div>
+          </div>
+
+          <div class="next-send">Próximo envío estimado: <span>~8h</span></div>
+        </div>
+        <div class="divider"></div>
+        <div class="window-footer">
+          <button class="btn-uninstall">Desinstalar</button>
+          <button class="btn-close">Cerrar ×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ MACOS ══════════ -->
+    <div class="platform-wrap">
+      <div class="platform-label">macOS</div>
+      <div class="window-mac">
+        <div class="titlebar-mac">
+          <div class="mac-dot close"></div>
+          <div class="mac-dot min"></div>
+          <div class="mac-dot max"></div>
+          <span class="mac-title">Jakite Agent</span>
+        </div>
+        <div class="version-badge">v1.7.0</div>
+        <div class="window-body">
+          <div class="update-banner">
+            <div class="update-text">⚠ Nueva versión disponible: <span>v1.8.0</span></div>
+            <button class="update-btn">Descargar</button>
+          </div>
+          <div class="apikey-row">
+            <span class="apikey-label">API Key</span>
+            <span class="apikey-value">abc1••••••••xyz9</span>
+            <button class="show-btn">Mostrar</button>
+          </div>
+          <div>
+            <div class="section-label">Último envío</div>
+            <div class="last-send-box">
+              <div class="last-send-date">11 mar 2026 · 09:42:31</div>
+              <div class="last-send-meta">3 herramientas · 47 sesiones enviadas</div>
+            </div>
+          </div>
+          <div class="activity-section">
+            <div class="section-label">Actividad desde el último envío</div>
+            <div class="activity-item">
+              <span class="activity-name">Claude Code</span>
+              <div class="bar-track"><div class="bar-fill high" style="width:82%"></div></div>
+              <span class="activity-badge high">Alta</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Cursor</span>
+              <div class="bar-track"><div class="bar-fill low" style="width:28%"></div></div>
+              <span class="activity-badge low">Poca</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Copilot</span>
+              <div class="bar-track"><div class="bar-fill none"></div></div>
+              <span class="activity-badge none">Sin datos</span>
+            </div>
+          </div>
+          <div class="next-send">Próximo envío estimado: <span>~8h</span></div>
+        </div>
+        <div class="divider"></div>
+        <div class="window-footer">
+          <button class="btn-uninstall">Desinstalar</button>
+          <button class="btn-close">Cerrar ×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ LINUX ══════════ -->
+    <div class="platform-wrap">
+      <div class="platform-label">Linux</div>
+      <div class="window-linux">
+        <div class="titlebar-linux">
+          <span class="linux-title">Jakite Agent</span>
+          <div class="linux-controls">
+            <div class="linux-btn min">−</div>
+            <div class="linux-btn max">□</div>
+            <div class="linux-btn close">×</div>
+          </div>
+        </div>
+        <div class="version-badge">v1.7.0</div>
+        <div class="window-body">
+          <div class="update-banner">
+            <div class="update-text">⚠ Nueva versión disponible: <span>v1.8.0</span></div>
+            <button class="update-btn">Descargar</button>
+          </div>
+          <div class="apikey-row">
+            <span class="apikey-label">API Key</span>
+            <span class="apikey-value">abc1••••••••xyz9</span>
+            <button class="show-btn">Mostrar</button>
+          </div>
+          <div>
+            <div class="section-label">Último envío</div>
+            <div class="last-send-box">
+              <div class="last-send-date">11 mar 2026 · 09:42:31</div>
+              <div class="last-send-meta">3 herramientas · 47 sesiones enviadas</div>
+            </div>
+          </div>
+          <div class="activity-section">
+            <div class="section-label">Actividad desde el último envío</div>
+            <div class="activity-item">
+              <span class="activity-name">Claude Code</span>
+              <div class="bar-track"><div class="bar-fill high" style="width:82%"></div></div>
+              <span class="activity-badge high">Alta</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Cursor</span>
+              <div class="bar-track"><div class="bar-fill low" style="width:28%"></div></div>
+              <span class="activity-badge low">Poca</span>
+            </div>
+            <div class="activity-item">
+              <span class="activity-name">Copilot</span>
+              <div class="bar-track"><div class="bar-fill none"></div></div>
+              <span class="activity-badge none">Sin datos</span>
+            </div>
+          </div>
+          <div class="next-send">Próximo envío estimado: <span>~8h</span></div>
+        </div>
+        <div class="divider"></div>
+        <div class="window-footer">
+          <button class="btn-uninstall">Desinstalar</button>
+          <button class="btn-close">Cerrar ×</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
