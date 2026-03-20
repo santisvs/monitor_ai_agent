@@ -1,4 +1,4 @@
-import type { AgentStatus } from '../ipc-types.js'
+import type { AgentStatus, ActivityItem } from '../ipc-types.js'
 
 type ElectronAPI = {
   getStatus: () => Promise<AgentStatus>
@@ -10,29 +10,50 @@ type ElectronAPI = {
 
 declare const window: Window & { electronAPI: ElectronAPI }
 
-const LEVEL_LABELS: Record<string, string> = {
-  high: 'Alta',
-  normal: 'Normal',
-  low: 'Poca',
-  none: 'Sin datos',
-}
-
 // Radio r=15.91549 → circunferencia ≈ 100, por lo que stroke-dasharray="${pct} ${100-pct}" es directo
 const DONUT_R = 15.91549
 
-function buildDonut(pct: number, level: string): string {
-  const filled = Math.max(0, Math.min(100, pct))
-  const empty = 100 - filled
-  const pctText = level === 'none' ? '—' : `${filled}%`
-  return `
-    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-      <circle class="donut-track" cx="18" cy="18" r="${DONUT_R}"/>
-      <circle class="donut-fill ${level}" cx="18" cy="18" r="${DONUT_R}"
-        stroke-dasharray="${filled} ${empty}"/>
-      <text class="donut-pct ${level === 'none' ? 'none' : ''}"
-        x="18" y="21" text-anchor="middle">${pctText}</text>
-    </svg>
-  `
+const TOOL_COLORS: Record<string, string> = {
+  'claude-code': '#3b82f6',
+  'cursor': '#8b5cf6',
+  'vscode-copilot': '#06b6d4',
+}
+const TOOL_COLORS_BG: Record<string, string> = {
+  'claude-code': '#eff6ff',
+  'cursor': '#f5f3ff',
+  'vscode-copilot': '#ecfeff',
+}
+const DEFAULT_COLOR = '#94a3b8'
+const DEFAULT_COLOR_BG = '#f8fafc'
+
+function buildMultiDonut(activities: ActivityItem[]): { svg: string; total: number } {
+  const withData = activities.filter(a => a.sessions > 0)
+  const total = withData.reduce((sum, a) => sum + a.sessions, 0)
+
+  if (total === 0) {
+    const svg = `<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <circle fill="none" stroke="#f1f5f9" stroke-width="3.5" cx="18" cy="18" r="${DONUT_R}"/>
+    </svg>`
+    return { svg, total: 0 }
+  }
+
+  let offset = 0
+  const segments = withData.map((a) => {
+    const pct = (a.sessions / total) * 100
+    const dashOffset = 100 - offset
+    const color = TOOL_COLORS[a.tool] ?? DEFAULT_COLOR
+    offset += pct
+    return `<circle fill="none" stroke="${color}" stroke-width="3.5" cx="18" cy="18" r="${DONUT_R}"
+      stroke-dasharray="${pct.toFixed(4)} ${(100 - pct).toFixed(4)}"
+      stroke-dashoffset="${dashOffset.toFixed(4)}"/>`
+  }).join('\n      ')
+
+  const svg = `<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(-90deg)">
+      <circle fill="none" stroke="#f1f5f9" stroke-width="3.5" cx="18" cy="18" r="${DONUT_R}"/>
+      ${segments}
+    </svg>`
+
+  return { svg, total }
 }
 
 function formatDate(iso: string): string {
@@ -71,21 +92,35 @@ async function loadStatus() {
       `${status.activities.length} herramienta${status.activities.length !== 1 ? 's' : ''} monitorizada${status.activities.length !== 1 ? 's' : ''}`
   }
 
-  const grid = document.getElementById('tools-grid')!
-  grid.innerHTML = ''
+  const { svg, total } = buildMultiDonut(status.activities)
+
+  const chartWrap = document.getElementById('chart-wrap')!
+  chartWrap.innerHTML = svg
+  const totalEl = document.createElement('div')
+  totalEl.className = 'chart-total'
+  totalEl.innerHTML = total > 0
+    ? `<span class="chart-total-num">${total}</span><span class="chart-total-sub">sesiones</span>`
+    : `<span class="chart-total-empty">Sin datos</span>`
+  chartWrap.appendChild(totalEl)
+
+  const legend = document.getElementById('tool-legend')!
+  legend.innerHTML = ''
+  const withData = status.activities.filter(a => a.sessions > 0)
+  const grandTotal = withData.reduce((s, a) => s + a.sessions, 0)
   for (const item of status.activities) {
-    const card = document.createElement('div')
-    card.className = 'tool-card'
-    const sessionsLabel = item.sessions === 1
-      ? '1 sesión'
-      : `${item.sessions} sesiones`
-    card.innerHTML = `
-      <div class="donut-wrap">${buildDonut(item.percentage, item.level)}</div>
-      <span class="tool-name">${item.label}</span>
-      <span class="tool-sessions">${item.level === 'none' ? 'Sin datos' : sessionsLabel}</span>
-      <span class="tool-badge ${item.level}">${LEVEL_LABELS[item.level] ?? item.level}</span>
+    const color = TOOL_COLORS[item.tool] ?? DEFAULT_COLOR
+    const colorBg = TOOL_COLORS_BG[item.tool] ?? DEFAULT_COLOR_BG
+    const pct = grandTotal > 0 ? Math.round((item.sessions / grandTotal) * 100) : 0
+    const sessionsLabel = item.sessions === 1 ? '1 sesión' : `${item.sessions} sesiones`
+    const row = document.createElement('div')
+    row.className = 'legend-row'
+    row.innerHTML = `
+      <span class="legend-dot" style="background:${color}"></span>
+      <span class="legend-name">${item.label}</span>
+      <span class="legend-pct" style="color:${color};background:${colorBg}">${item.sessions > 0 ? `${pct}%` : '—'}</span>
+      <span class="legend-sessions">${item.sessions > 0 ? sessionsLabel : 'Sin datos'}</span>
     `
-    grid.appendChild(card)
+    legend.appendChild(row)
   }
 
   document.getElementById('next-send-label')!.textContent = formatNextSend(status.nextSendEstimate)
