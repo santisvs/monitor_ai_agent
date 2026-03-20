@@ -401,6 +401,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
             label: toolLabels[tool] ?? tool,
             level,
             percentage,
+            sessions: currentSessions,
           })
         }
       } catch {

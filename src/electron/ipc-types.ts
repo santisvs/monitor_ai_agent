@@ -12,6 +12,7 @@ export interface ActivityItem {
   label: string
   level: 'high' | 'normal' | 'low' | 'none'
   percentage: number
+  sessions: number
 }
 
 export interface InstallerSetup {
