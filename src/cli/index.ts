@@ -3,6 +3,7 @@ import readline from 'readline'
 import { loadConfig, saveConfig, configExists, updateSendHistory, type AgentConfig } from '../core/config.js'
 import { collectAll } from '../core/collector-runner.js'
 import { sendMetrics } from '../core/sender.js'
+import { SyncStateManager, DEFAULT_SYNC_STATE_PATH } from '../core/sync-state.js'
 import { serviceInstall, serviceUninstall, serviceStatus } from '../core/service.js'
 import { AGENT_VERSION as CLI_VERSION } from '../core/agent-version.js'
 import type { CollectorResult } from '../core/types.js'
@@ -251,7 +252,7 @@ async function runOnce() {
   console.log(`  ${results.length} resultados recolectados`)
 
   if (results.length > 0) {
-    const sent = await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION)
+    const sent = await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
     if (sent) {
       const sessions: Record<string, number> = {}
       for (const r of results) {
@@ -286,7 +287,7 @@ async function run() {
     console.log(`  ${results.length} resultados recolectados`)
 
     if (results.length > 0) {
-      await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION)
+      await sendMetrics(config.serverUrl, config.authToken, results, CLI_VERSION, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
     }
   }
 

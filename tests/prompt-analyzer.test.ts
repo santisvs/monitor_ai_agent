@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   analyzeSessionPrompts,
   aggregatePromptingMetrics,
+  aggregatePromptingMetricsByTool,
   type SessionMessage,
+  type SessionPromptingData,
 } from '../src/core/analyzers/prompt-analyzer.js'
 
 function sessionWithOnePrompt(content: string): SessionMessage[] {
@@ -191,5 +193,55 @@ describe('PromptAnalyzer', () => {
       const elapsed = performance.now() - start
       expect(elapsed).toBeLessThan(2000)
     })
+  })
+})
+
+function makePromptingSession(tool: string, overrides: Partial<SessionPromptingData> = {}): SessionPromptingData {
+  return {
+    tool,
+    promptLengths: [200],
+    hasStructure: false,
+    hasCodeBlocks: false,
+    hasExamples: false,
+    hasFormatting: false,
+    hasFileRefs: false,
+    hasCodeRefs: false,
+    hasUrls: false,
+    hasRolePrompt: false,
+    hasConstraints: false,
+    hasStepByStep: false,
+    hasOutputFormat: false,
+    turnCount: 5,
+    hasRefinement: false,
+    hasFollowUp: false,
+    ...overrides,
+  }
+}
+
+describe('aggregatePromptingMetricsByTool', () => {
+  it('returns empty object for empty sessions', () => {
+    expect(aggregatePromptingMetricsByTool([])).toEqual({})
+  })
+
+  it('separates metrics by tool', () => {
+    const sessions = [
+      makePromptingSession('claude-code', { promptLengths: [500] }),
+      makePromptingSession('claude-code', { promptLengths: [300] }),
+      makePromptingSession('cursor', { promptLengths: [100] }),
+    ]
+    const result = aggregatePromptingMetricsByTool(sessions)
+    expect(Object.keys(result)).toEqual(expect.arrayContaining(['claude-code', 'cursor']))
+    expect(result['claude-code'].avgPromptLength).toBe(400)
+    expect(result['cursor'].avgPromptLength).toBe(100)
+  })
+
+  it('produces independent results per tool', () => {
+    const sessions = [
+      makePromptingSession('claude-code', { hasConstraints: true }),
+      makePromptingSession('cursor', { hasConstraints: false }),
+    ]
+    const result = aggregatePromptingMetricsByTool(sessions)
+    expect(result['claude-code'].usesConstraints).toBe(true)
+    expect(result['cursor'].usesConstraints).toBe(false)
   })
 })

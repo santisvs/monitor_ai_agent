@@ -165,6 +165,21 @@ export interface ExtendedMetrics {
   [key: string]: unknown
 }
 
+// Nota: tipo duplicado desde monitor_ai/server/utils/agent-metrics.ts — mantener sincronizados
+export type ProblematicPattern =
+  | 'shallow'
+  | 'no-context'
+  | 'no-plan'
+  | 'repetitive-corrections'
+
+export type Severity = 'low' | 'medium' | 'high'
+
+export interface ProblematicSession {
+  pattern: ProblematicPattern
+  count: number
+  severity: Severity
+}
+
 /**
  * Resultado de un collector
  */
@@ -172,6 +187,9 @@ export interface CollectorResult {
   tool: string
   metrics: ExtendedMetrics
   collectedAt: string
+  promptingSessions?: import('./analyzers/prompt-analyzer.js').SessionPromptingData[]
+  workflowSessions?: import('./analyzers/workflow-analyzer.js').SessionWorkflowData[]
+  problematicSessions?: ProblematicSession[]
 }
 
 /**

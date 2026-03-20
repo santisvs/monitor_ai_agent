@@ -23,6 +23,7 @@ export interface MetaCognitionData {
 }
 
 export interface SessionWorkflowData {
+  tool?: string
   skills: string[]
   atReferences: AtReferenceData
   actions: string[]
@@ -319,4 +320,26 @@ export function aggregateWorkflowMetrics(sessions: SessionWorkflowData[]): Workf
     totalSessionsAnalyzed: total,
     analysisVersion: ANALYSIS_VERSION,
   }
+}
+
+/**
+ * Agrega WorkflowMetrics separando por herramienta.
+ * Reutiliza aggregateWorkflowMetrics() internamente para cada grupo.
+ */
+export function aggregateWorkflowMetricsByTool(
+  sessions: SessionWorkflowData[],
+): Record<string, WorkflowMetrics> {
+  const byTool = new Map<string, SessionWorkflowData[]>()
+
+  for (const session of sessions) {
+    const tool = session.tool ?? 'unknown'
+    if (!byTool.has(tool)) byTool.set(tool, [])
+    byTool.get(tool)!.push(session)
+  }
+
+  const result: Record<string, WorkflowMetrics> = {}
+  for (const [tool, toolSessions] of byTool) {
+    result[tool] = aggregateWorkflowMetrics(toolSessions)
+  }
+  return result
 }

@@ -12,6 +12,7 @@ export interface SessionMessage {
 }
 
 export interface SessionPromptingData {
+  tool?: string
   promptLengths: number[]
   hasStructure: boolean
   hasCodeBlocks: boolean
@@ -235,4 +236,26 @@ export function aggregatePromptingMetrics(sessions: SessionPromptingData[]): Pro
     totalPromptsAnalyzed: totalPrompts,
     analysisVersion: ANALYSIS_VERSION,
   }
+}
+
+/**
+ * Agrega PromptingMetrics separando por herramienta.
+ * Reutiliza aggregatePromptingMetrics() internamente para cada grupo.
+ */
+export function aggregatePromptingMetricsByTool(
+  sessions: SessionPromptingData[],
+): Record<string, PromptingMetrics> {
+  const byTool = new Map<string, SessionPromptingData[]>()
+
+  for (const session of sessions) {
+    const tool = session.tool ?? 'unknown'
+    if (!byTool.has(tool)) byTool.set(tool, [])
+    byTool.get(tool)!.push(session)
+  }
+
+  const result: Record<string, PromptingMetrics> = {}
+  for (const [tool, toolSessions] of byTool) {
+    result[tool] = aggregatePromptingMetrics(toolSessions)
+  }
+  return result
 }

@@ -1,11 +1,32 @@
 import type { CollectorResult } from './types.js'
+import { aggregatePromptingMetricsByTool } from './analyzers/prompt-analyzer.js'
+import { aggregateWorkflowMetricsByTool } from './analyzers/workflow-analyzer.js'
+import { detectProblematicPatterns } from './analyzers/problem-detector.js'
+import type { SyncStateManager } from './sync-state.js'
 
 export async function sendMetrics(
   serverUrl: string,
   authToken: string,
   results: CollectorResult[],
   agentVersion: string = '1.0.0',
+  syncState?: SyncStateManager,
 ): Promise<boolean> {
+  // Recoger todas las sesiones etiquetadas para análisis per-tool
+  const allPromptingSessions = results.flatMap(r => r.promptingSessions ?? [])
+  const allWorkflowSessions = results.flatMap(r => r.workflowSessions ?? [])
+
+  const promptingByTool = aggregatePromptingMetricsByTool(allPromptingSessions)
+  const workflowByTool = aggregateWorkflowMetricsByTool(allWorkflowSessions)
+  const problematicByTool = detectProblematicPatterns(
+    allWorkflowSessions.map(s => ({
+      tool: s.tool ?? 'unknown',
+      turns: s.skills.length + 1, // proxy: más skills = más turns
+      actions: s.actions,
+      contextProvisionRate: s.atReferences.count > 0 ? 1 : 0,
+      messages: [],
+    })),
+  )
+
   const maxRetries = 3
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -26,6 +47,9 @@ export async function sendMetrics(
               collectedAt: r.collectedAt,
               ...(prompting && Object.keys(prompting).length > 0 && { prompting }),
               ...(workflow && Object.keys(workflow).length > 0 && { workflow }),
+              ...(promptingByTool[r.tool] && { promptingPerTool: promptingByTool[r.tool] }),
+              ...(workflowByTool[r.tool] && { workflowPerTool: workflowByTool[r.tool] }),
+              problematicSessions: problematicByTool[r.tool] ?? [],
             }
           }),
         }),
@@ -33,6 +57,16 @@ export async function sendMetrics(
 
       if (response.ok) {
         console.log(`Métricas enviadas correctamente (${results.length} collectors)`)
+
+        // Persistir lastSyncedAt de la respuesta del servidor
+        if (syncState) {
+          const data = await response.json() as { syncedAt?: string }
+          const syncedAt = data.syncedAt ? new Date(data.syncedAt) : new Date()
+          for (const result of results) {
+            syncState.setLastSyncedAt(result.tool, syncedAt)
+          }
+        }
+
         return true
       }
 
@@ -43,7 +77,8 @@ export async function sendMetrics(
         console.error('Token inválido. Ejecuta: monitor-ia-agent setup <token>')
         return false
       }
-    } catch (err: any) {
+    }
+    catch (err: any) {
       console.error(`Intento ${attempt}/${maxRetries} falló: ${err.message}`)
     }
 

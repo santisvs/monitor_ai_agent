@@ -24,6 +24,7 @@ import {
   aggregateWorkflowMetrics,
   analyzeSessionWorkflow,
 } from '../analyzers/workflow-analyzer.js'
+import { SyncStateManager } from '../sync-state.js'
 
 interface SessionAnalysis {
   sessionId: string
@@ -47,7 +48,7 @@ interface SessionAnalysis {
  * Collector para Claude Code.
  * Parsea ~/.claude/projects/ y stats-cache.json para extraer métricas detalladas.
  */
-export function collectClaudeCode(): CollectorResult {
+export function collectClaudeCode(syncState?: SyncStateManager): CollectorResult {
   const claudeDir = path.join(os.homedir(), '.claude')
   const projectsDir = path.join(claudeDir, 'projects')
   const statsCachePath = path.join(claudeDir, 'stats-cache.json')
@@ -260,6 +261,18 @@ export function collectClaudeCode(): CollectorResult {
     .map(s => analyzeSessionWorkflow(s.messages, s.skillsFromToolCalls))
   metrics.workflow = aggregateWorkflowMetrics(workflowData)
 
+  // Sesiones nuevas desde el último sync (para per-tool scoring en el servidor)
+  const lastSyncedAt = syncState?.getLastSyncedAt('claude-code') ?? null
+  const newSessions = lastSyncedAt
+    ? recentSessions.filter(s => s.mtimeMs > lastSyncedAt.getTime())
+    : recentSessions
+  const promptingSessions = newSessions
+    .filter(s => s.messages.length > 0)
+    .map(s => ({ ...analyzeSessionPrompts(s.messages), tool: 'claude-code' }))
+  const workflowSessions = newSessions
+    .filter(s => s.messages.length > 0)
+    .map(s => ({ ...analyzeSessionWorkflow(s.messages, s.skillsFromToolCalls), tool: 'claude-code' }))
+
   // Encriptar datos sensibles si hay clave
   if (isValidEncryptionKey(encryptionKey) && sessionAnalyses.length > 0) {
     const sessionDetails: SessionDetail[] = sessionAnalyses.map(s => ({
@@ -276,7 +289,7 @@ export function collectClaudeCode(): CollectorResult {
     }
   }
 
-  return { tool: 'claude-code', metrics, collectedAt: new Date().toISOString() }
+  return { tool: 'claude-code', metrics, collectedAt: new Date().toISOString(), promptingSessions, workflowSessions }
 }
 
 /**

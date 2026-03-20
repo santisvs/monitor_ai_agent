@@ -25,6 +25,7 @@ import {
   aggregateWorkflowMetrics,
   analyzeSessionWorkflow,
 } from '../analyzers/workflow-analyzer.js'
+import { SyncStateManager } from '../sync-state.js'
 
 /** Key en ItemTable de state.vscdb donde Cursor guarda el chat (formato puede variar entre versiones). */
 const CHATDATA_KEY = 'workbench.panel.aichat.view.aichat.chatdata'
@@ -484,7 +485,7 @@ async function readSkillsFromAiServicePrompts(dbPath: string): Promise<string[]>
   }
 }
 
-export async function collectCursor(): Promise<CollectorResult> {
+export async function collectCursor(syncState?: SyncStateManager): Promise<CollectorResult> {
   const workspaceStorageDir = getCursorWorkspaceStorageDir()
   const metrics: ExtendedMetrics = {
     sessionsCount: 0,
@@ -652,6 +653,20 @@ export async function collectCursor(): Promise<CollectorResult> {
     metrics.workflow = aggregateWorkflowMetrics(workflowData)
   }
 
+  // Sesiones nuevas desde el último sync (para per-tool scoring)
+  // Cursor no tiene timestamps por sesión: usamos workspaceEntries con mtime como proxy
+  const lastSyncedAt = syncState?.getLastSyncedAt('cursor') ?? null
+  const newWorkspaceMtimes = lastSyncedAt
+    ? workspaceEntries.filter(w => w.mtime > lastSyncedAt.getTime())
+    : workspaceEntries
+  const newSessionsForTool = lastSyncedAt
+    ? sessionsWithMessages.filter((_, i) => i < newWorkspaceMtimes.length * 20) // proxy: nuevas primero
+    : sessionsWithMessages
+  const promptingSessions = newSessionsForTool
+    .map(s => ({ ...analyzeSessionPrompts(s.messages), tool: 'cursor' }))
+  const workflowSessions = newSessionsForTool
+    .map(s => ({ ...analyzeSessionWorkflow(s.messages, []), tool: 'cursor' }))
+
   // Extraer skills de aiService.prompts (contiene el texto completo con el slash command)
   // Los bubbles de composer.composerData pierden el prefijo, pero aiService.prompts lo conserva
   const allSkillsFromPrompts: string[] = []
@@ -723,5 +738,5 @@ export async function collectCursor(): Promise<CollectorResult> {
     } catch {}
   }
 
-  return { tool: 'cursor', metrics, collectedAt: new Date().toISOString() }
+  return { tool: 'cursor', metrics, collectedAt: new Date().toISOString(), promptingSessions, workflowSessions }
 }

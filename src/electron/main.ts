@@ -6,6 +6,7 @@ import { loadBrandConfig } from './brand'
 import { loadConfig, saveConfig, configExists, updateSendHistory } from '../core/config'
 import { sendMetrics } from '../core/sender'
 import { serviceInstall, serviceUninstall } from '../core/service'
+import { SyncStateManager, DEFAULT_SYNC_STATE_PATH } from '../core/sync-state'
 import { calculateActivityLevel } from './activity'
 import type { AgentStatus, ActivityItem, InstallerSetup } from './ipc-types'
 
@@ -50,7 +51,7 @@ async function tryCollectIfStale(): Promise<void> {
     const results = await collectAll(config)
     const agentVersion = app.getVersion()
     if (results.length > 0) {
-      const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
+      const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
       if (sent) {
         const sessions: Record<string, number> = {}
         for (const r of results) {
@@ -301,7 +302,7 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
       const agentVersion = app.getVersion()
 
       if (results.length > 0) {
-        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
         if (sent) {
           const sessions: Record<string, number> = {}
           for (const r of results) {
@@ -482,7 +483,7 @@ app.whenReady().then(async () => {
       const agentVersion = app.getVersion()
 
       if (results.length > 0) {
-        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion)
+        const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
         if (sent) {
           const sessions: Record<string, number> = {}
           for (const r of results) {
