@@ -7,7 +7,9 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json')
 
 export interface SendHistoryEntry {
   sentAt: string
-  sessions: Record<string, number>
+  sessions: Record<string, number>          // total acumulado
+  sessionsWeek?: Record<string, number>     // últimos 7 días (sessionFrequency)
+  sessionsSinceSync?: Record<string, number> // desde el sync anterior
 }
 
 export interface AgentConfig {
@@ -56,8 +58,10 @@ export function getConfigDir(): string {
 export function updateSendHistory(
   history: SendHistoryEntry[],
   sentAt: string,
-  sessions: Record<string, number>
+  sessions: Record<string, number>,
+  sessionsWeek?: Record<string, number>,
+  sessionsSinceSync?: Record<string, number>,
 ): SendHistoryEntry[] {
-  const updated = [...history, { sentAt, sessions }]
+  const updated = [...history, { sentAt, sessions, sessionsWeek, sessionsSinceSync }]
   return updated.slice(-5)
 }

@@ -54,11 +54,16 @@ async function tryCollectIfStale(): Promise<void> {
       const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
       if (sent) {
         const sessions: Record<string, number> = {}
+          const sessionsWeek: Record<string, number> = {}
+          const sessionsSinceSync: Record<string, number> = {}
         for (const r of results) {
-          sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+            const metrics = r.metrics as Record<string, unknown>
+            sessions[r.tool] = (metrics.sessionsCount as number) ?? 0
+            sessionsWeek[r.tool] = (metrics.sessionFrequency as number) ?? 0
+            sessionsSinceSync[r.tool] = (metrics.sessionsSinceLastSync as number) ?? 0
         }
         config.lastSentAt = new Date().toISOString()
-        config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions, sessionsWeek, sessionsSinceSync)
         saveConfig(config)
       }
     }
@@ -184,6 +189,51 @@ function isTrustedUrl(url: string, brand: ReturnType<typeof loadBrandConfig>): b
   }
 }
 
+function getEstimatedSessionsSinceSync(
+  history: Array<{ sessions: Record<string, number>; sessionsSinceSync?: Record<string, number> }>,
+  tool: string,
+): number {
+  const lastEntry = history[history.length - 1]
+  if (!lastEntry) return 0
+  const explicit = lastEntry.sessionsSinceSync?.[tool]
+  if (typeof explicit === 'number') return explicit
+
+  const lastTotal = lastEntry.sessions[tool] ?? 0
+  if (history.length < 2) return lastTotal
+
+  const prevTotal = history[history.length - 2]?.sessions[tool] ?? 0
+  return Math.max(0, lastTotal - prevTotal)
+}
+
+function getEstimatedSessionsWeek(
+  history: Array<{ sentAt?: string; sessions: Record<string, number>; sessionsWeek?: Record<string, number> }>,
+  tool: string,
+): number {
+  const lastEntry = history[history.length - 1]
+  if (!lastEntry) return 0
+  const explicit = lastEntry.sessionsWeek?.[tool]
+  if (typeof explicit === 'number') return explicit
+
+  if (history.length < 2) return lastEntry.sessions[tool] ?? 0
+
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  let weeklySum = 0
+
+  for (let i = 1; i < history.length; i++) {
+    const current = history[i]
+    const previous = history[i - 1]
+    const sentAtMs = current.sentAt ? new Date(current.sentAt).getTime() : NaN
+    if (!Number.isNaN(sentAtMs) && sentAtMs >= oneWeekAgo) {
+      const curr = current.sessions[tool] ?? 0
+      const prev = previous.sessions[tool] ?? 0
+      weeklySum += Math.max(0, curr - prev)
+    }
+  }
+
+  if (weeklySum > 0) return weeklySum
+  return getEstimatedSessionsSinceSync(history, tool)
+}
+
 function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
   // ── Installer ──────────────────────────────────────────────────────────────
 
@@ -305,11 +355,16 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
         const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
         if (sent) {
           const sessions: Record<string, number> = {}
+          const sessionsWeek: Record<string, number> = {}
+          const sessionsSinceSync: Record<string, number> = {}
           for (const r of results) {
-            sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+            const metrics = r.metrics as Record<string, unknown>
+            sessions[r.tool] = (metrics.sessionsCount as number) ?? 0
+            sessionsWeek[r.tool] = (metrics.sessionFrequency as number) ?? 0
+            sessionsSinceSync[r.tool] = (metrics.sessionsSinceLastSync as number) ?? 0
           }
           config.lastSentAt = new Date().toISOString()
-          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions, sessionsWeek, sessionsSinceSync)
           saveConfig(config)
         }
       }
@@ -395,6 +450,8 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
         for (const tool of allTools) {
           const lastEntry = history[history.length - 1]
           const currentSessions = lastEntry?.sessions[tool] ?? 0
+          const currentSessionsWeek = getEstimatedSessionsWeek(history, tool)
+          const currentSessionsSinceSync = getEstimatedSessionsSinceSync(history, tool)
           const { level, percentage } = calculateActivityLevel(currentSessions, history, tool)
           activities.push({
             tool,
@@ -402,6 +459,8 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
             level,
             percentage,
             sessions: currentSessions,
+            sessionsWeek: currentSessionsWeek,
+            sessionsSinceSync: currentSessionsSinceSync,
           })
         }
       } catch {
@@ -487,11 +546,16 @@ app.whenReady().then(async () => {
         const sent = await sendMetrics(config.serverUrl, config.authToken, results, agentVersion, new SyncStateManager(DEFAULT_SYNC_STATE_PATH))
         if (sent) {
           const sessions: Record<string, number> = {}
+          const sessionsWeek: Record<string, number> = {}
+          const sessionsSinceSync: Record<string, number> = {}
           for (const r of results) {
-            sessions[r.tool] = (r.metrics as Record<string, unknown>).sessionsCount as number ?? 0
+            const metrics = r.metrics as Record<string, unknown>
+            sessions[r.tool] = (metrics.sessionsCount as number) ?? 0
+            sessionsWeek[r.tool] = (metrics.sessionFrequency as number) ?? 0
+            sessionsSinceSync[r.tool] = (metrics.sessionsSinceLastSync as number) ?? 0
           }
           config.lastSentAt = new Date().toISOString()
-          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions)
+          config.sendHistory = updateSendHistory(config.sendHistory ?? [], config.lastSentAt, sessions, sessionsWeek, sessionsSinceSync)
           saveConfig(config)
         }
       }

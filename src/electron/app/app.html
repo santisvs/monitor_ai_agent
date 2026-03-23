@@ -50,6 +50,21 @@
 
     /* ── Section label ── */
     .section-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .section-head .section-label { flex: 1; min-width: 0; letter-spacing: .6px; }
+    .view-switch { display: inline-flex; gap: 4px; }
+    .view-btn {
+      font-family: inherit;
+      line-height: 1.1;
+      appearance: none;
+      -webkit-appearance: none;
+      font-size: 10px; font-weight: 700; letter-spacing: .2px;
+      border: 1px solid #dbeafe; border-radius: 999px; padding: 2px 8px;
+      background: #ffffff; color: #64748b; cursor: pointer;
+      min-width: 52px; height: 30px;
+    }
+    .view-btn:hover { background: #f8fafc; }
+    .view-btn.active { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
 
     /* ── Last send card ── */
     .last-send-box {
@@ -134,7 +149,14 @@
     </div>
 
     <div>
-      <div class="section-label">Datos recopilados por herramienta</div>
+      <div class="section-head">
+        <div class="section-label" style="margin-bottom:0">Datos por herramienta</div>
+        <div class="view-switch">
+          <button class="view-btn active" id="view-last" data-view="last">Último</button>
+          <button class="view-btn" id="view-week" data-view="week">7 días</button>
+          <button class="view-btn" id="view-total" data-view="total">Total</button>
+        </div>
+      </div>
       <div class="chart-box">
         <div class="chart-wrap" id="chart-wrap"></div>
         <div class="tool-legend" id="tool-legend"></div>

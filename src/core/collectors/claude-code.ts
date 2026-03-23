@@ -42,6 +42,8 @@ interface SessionAnalysis {
   messages: SessionMessage[]
   /** Tiempo de modificación del archivo .jsonl (ms desde epoch) para ordenar por recencia */
   mtimeMs: number
+  /** Duración estimada de la sesión en minutos (desde primer al último timestamp del JSONL) */
+  durationMinutes: number
 }
 
 /**
@@ -217,6 +219,15 @@ export function collectClaudeCode(syncState?: SyncStateManager): CollectorResult
     metrics.avgTokensPerSession = Math.round((metrics.totalTokens || 0) / sessionAnalyses.length)
   }
 
+  // Tiempo total = suma de duraciones individuales de sesión (estimado desde timestamps JSONL)
+  metrics.timeSpentMinutes = sessionAnalyses.reduce((s, a) => s + a.durationMinutes, 0)
+
+  // Sesiones desde el último sync
+  const lastSyncedAt = syncState?.getLastSyncedAt('claude-code') ?? null
+  metrics.sessionsSinceLastSync = lastSyncedAt
+    ? sessionAnalyses.filter(s => s.mtimeMs > lastSyncedAt.getTime()).length
+    : sessionAnalyses.length
+
   metrics.toolsUsedPerSession = Array.from(allToolsUsed)
   metrics.usesPlanMode = usesPlanMode
   metrics.usesExtendedThinking = usesExtendedThinking
@@ -262,9 +273,9 @@ export function collectClaudeCode(syncState?: SyncStateManager): CollectorResult
   metrics.workflow = aggregateWorkflowMetrics(workflowData)
 
   // Sesiones nuevas desde el último sync (para per-tool scoring en el servidor)
-  const lastSyncedAt = syncState?.getLastSyncedAt('claude-code') ?? null
-  const newSessions = lastSyncedAt
-    ? recentSessions.filter(s => s.mtimeMs > lastSyncedAt.getTime())
+  const lastSyncedAtForScoring = syncState?.getLastSyncedAt('claude-code') ?? null
+  const newSessions = lastSyncedAtForScoring
+    ? recentSessions.filter(s => s.mtimeMs > lastSyncedAtForScoring.getTime())
     : recentSessions
   const promptingSessions = newSessions
     .filter(s => s.messages.length > 0)
@@ -351,10 +362,21 @@ function analyzeSession(
     let usesExtendedThinking = false
     let firstPrompt = ''
     const messages: SessionMessage[] = []
+    let firstTimestampMs = 0
+    let lastTimestampMs = 0
 
     for (const line of lines) {
       try {
         const msg: ClaudeMessage = JSON.parse(line)
+
+        // Capturar timestamps para estimar duración de sesión
+        if (msg.timestamp) {
+          const ts = new Date(msg.timestamp).getTime()
+          if (!Number.isNaN(ts)) {
+            if (firstTimestampMs === 0) firstTimestampMs = ts
+            if (ts > lastTimestampMs) lastTimestampMs = ts
+          }
+        }
 
         // Contar turnos (mensajes de usuario y asistente)
         if (msg.message?.role === 'user' || msg.message?.role === 'assistant') {
@@ -424,6 +446,12 @@ function analyzeSession(
     // Inferir tipo de tarea
     const taskType = inferTaskType(summary, firstPrompt)
 
+    // Duración de sesión: diferencia entre primer y último timestamp del JSONL.
+    // Se añade 1 min mínimo si hay al menos un mensaje (tiempo de lectura de respuesta).
+    const durationMinutes = (firstTimestampMs > 0 && lastTimestampMs > firstTimestampMs)
+      ? Math.max(1, Math.round((lastTimestampMs - firstTimestampMs) / 60000))
+      : (turns > 0 ? 1 : 0)
+
     return {
       sessionId,
       turns,
@@ -437,6 +465,7 @@ function analyzeSession(
       taskType,
       messages,
       mtimeMs: 0, // Se sobreescribe en el caller con fileStat.mtimeMs
+      durationMinutes,
     }
   } catch {
     return null

@@ -71,6 +71,8 @@ interface SessionAnalysis {
   firstPrompt: string
   taskType: TaskType
   messages: SessionMessage[]
+  /** Duración estimada en minutos: turns × 1.5 (no hay timestamps por bubble en Cursor) */
+  durationMinutes: number
 }
 
 function getCursorWorkspaceStorageDir(): string {
@@ -234,6 +236,10 @@ function parseChatDataToSessions(
     const taskType = inferTaskType(summary, firstPrompt)
     const sessionId = `${workspaceId}_tab_${tabIndex}`
 
+    // Estimar duración: Cursor no expone timestamps por bubble ni por tab de forma fiable.
+    // turns × 1.5 min es una estimación conservadora (usuario escribe + IA responde).
+    const durationMinutes = Math.max(1, Math.round(turns * 1.5))
+
     sessions.push({
       sessionId,
       turns,
@@ -244,6 +250,7 @@ function parseChatDataToSessions(
       firstPrompt,
       taskType,
       messages,
+      durationMinutes,
     })
   }
   return sessions
@@ -622,6 +629,16 @@ export async function collectCursor(syncState?: SyncStateManager): Promise<Colle
     metrics.avgTurnsPerSession = Math.round((totalTurns / sessionAnalyses.length) * 10) / 10
     metrics.avgTokensPerSession = 0
   }
+
+  // Tiempo total estimado = suma de duraciones por sesión (turns × 1.5 min)
+  metrics.timeSpentMinutes = sessionAnalyses.reduce((s, a) => s + a.durationMinutes, 0)
+
+  // Sesiones desde el último sync (proxy: sesiones en workspaces modificados tras lastSyncedAt)
+  const lastSyncedAtCursor = syncState?.getLastSyncedAt('cursor') ?? null
+  metrics.sessionsSinceLastSync = lastSyncedAtCursor
+    ? sessionDates.filter(d => d > lastSyncedAtCursor.getTime()).length
+    : sessionDates.length
+
   metrics.toolsUsedPerSession = Array.from(allToolsUsed)
   metrics.usesPlanMode = usesPlanMode
   metrics.usesExtendedThinking = false

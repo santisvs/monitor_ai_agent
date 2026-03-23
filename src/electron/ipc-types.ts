@@ -12,7 +12,9 @@ export interface ActivityItem {
   label: string
   level: 'high' | 'normal' | 'low' | 'none'
   percentage: number
-  sessions: number
+  sessions: number          // total acumulado
+  sessionsWeek: number      // últimos 7 días
+  sessionsSinceSync: number // desde el último envío
 }
 
 export interface InstallerSetup {

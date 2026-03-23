@@ -153,6 +153,9 @@ export interface ExtendedMetrics {
   // Métricas de workflow (orquestación: skills, @refs, flujos)
   workflow?: WorkflowMetrics
 
+  /** Sesiones nuevas desde el último sync (para mostrar en la UI del agente) */
+  sessionsSinceLastSync?: number
+
   // Para otros collectors
   hasAiFeatures?: boolean
   extensionsCount?: number
@@ -197,6 +200,7 @@ export interface CollectorResult {
  */
 export interface ClaudeMessage {
   type?: string
+  timestamp?: string  // ISO 8601 — presente en todos los mensajes del JSONL
   message?: {
     role?: string
     content?: string | unknown[]

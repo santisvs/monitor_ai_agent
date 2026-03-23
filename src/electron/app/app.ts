@@ -26,9 +26,19 @@ const TOOL_COLORS_BG: Record<string, string> = {
 const DEFAULT_COLOR = '#94a3b8'
 const DEFAULT_COLOR_BG = '#f8fafc'
 
-function buildMultiDonut(activities: ActivityItem[]): { svg: string; total: number } {
-  const withData = activities.filter(a => a.sessions > 0)
-  const total = withData.reduce((sum, a) => sum + a.sessions, 0)
+type ViewMode = 'last' | 'week' | 'total'
+let selectedView: ViewMode = 'last'
+let currentActivities: ActivityItem[] = []
+
+function sessionsByView(item: ActivityItem, view: ViewMode): number {
+  if (view === 'total') return item.sessions
+  if (view === 'week') return item.sessionsWeek
+  return item.sessionsSinceSync
+}
+
+function buildMultiDonut(activities: ActivityItem[], view: ViewMode): { svg: string; total: number } {
+  const withData = activities.filter(a => sessionsByView(a, view) > 0)
+  const total = withData.reduce((sum, a) => sum + sessionsByView(a, view), 0)
 
   if (total === 0) {
     const svg = `<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
@@ -39,7 +49,8 @@ function buildMultiDonut(activities: ActivityItem[]): { svg: string; total: numb
 
   let offset = 0
   const segments = withData.map((a) => {
-    const pct = (a.sessions / total) * 100
+    const value = sessionsByView(a, view)
+    const pct = (value / total) * 100
     const dashOffset = 100 - offset
     const color = TOOL_COLORS[a.tool] ?? DEFAULT_COLOR
     offset += pct
@@ -54,6 +65,47 @@ function buildMultiDonut(activities: ActivityItem[]): { svg: string; total: numb
     </svg>`
 
   return { svg, total }
+}
+
+function renderActivityPanel(activities: ActivityItem[], view: ViewMode) {
+  const { svg, total } = buildMultiDonut(activities, view)
+
+  const chartWrap = document.getElementById('chart-wrap')!
+  chartWrap.innerHTML = svg
+  const totalEl = document.createElement('div')
+  totalEl.className = 'chart-total'
+  totalEl.innerHTML = total > 0
+    ? `<span class="chart-total-num">${total}</span><span class="chart-total-sub">sesiones</span>`
+    : `<span class="chart-total-empty">Sin datos</span>`
+  chartWrap.appendChild(totalEl)
+
+  const legend = document.getElementById('tool-legend')!
+  legend.innerHTML = ''
+  const withData = activities.filter(a => sessionsByView(a, view) > 0)
+  const grandTotal = withData.reduce((s, a) => s + sessionsByView(a, view), 0)
+  for (const item of activities) {
+    const color = TOOL_COLORS[item.tool] ?? DEFAULT_COLOR
+    const colorBg = TOOL_COLORS_BG[item.tool] ?? DEFAULT_COLOR_BG
+    const value = sessionsByView(item, view)
+    const pct = grandTotal > 0 ? Math.round((value / grandTotal) * 100) : 0
+    const sessionsLabel = value === 1 ? '1 sesión' : `${value} sesiones`
+    const row = document.createElement('div')
+    row.className = 'legend-row'
+    row.innerHTML = `
+      <span class="legend-dot" style="background:${color}"></span>
+      <span class="legend-name">${item.label}</span>
+      <span class="legend-pct" style="color:${color};background:${colorBg}">${value > 0 ? `${pct}%` : '—'}</span>
+      <span class="legend-sessions">${value > 0 ? sessionsLabel : 'Sin datos'}</span>
+    `
+    legend.appendChild(row)
+  }
+}
+
+function updateViewButtons() {
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.view-btn'))
+  for (const btn of buttons) {
+    btn.classList.toggle('active', btn.dataset.view === selectedView)
+  }
 }
 
 function formatDate(iso: string): string {
@@ -92,36 +144,9 @@ async function loadStatus() {
       `${status.activities.length} herramienta${status.activities.length !== 1 ? 's' : ''} monitorizada${status.activities.length !== 1 ? 's' : ''}`
   }
 
-  const { svg, total } = buildMultiDonut(status.activities)
-
-  const chartWrap = document.getElementById('chart-wrap')!
-  chartWrap.innerHTML = svg
-  const totalEl = document.createElement('div')
-  totalEl.className = 'chart-total'
-  totalEl.innerHTML = total > 0
-    ? `<span class="chart-total-num">${total}</span><span class="chart-total-sub">sesiones</span>`
-    : `<span class="chart-total-empty">Sin datos</span>`
-  chartWrap.appendChild(totalEl)
-
-  const legend = document.getElementById('tool-legend')!
-  legend.innerHTML = ''
-  const withData = status.activities.filter(a => a.sessions > 0)
-  const grandTotal = withData.reduce((s, a) => s + a.sessions, 0)
-  for (const item of status.activities) {
-    const color = TOOL_COLORS[item.tool] ?? DEFAULT_COLOR
-    const colorBg = TOOL_COLORS_BG[item.tool] ?? DEFAULT_COLOR_BG
-    const pct = grandTotal > 0 ? Math.round((item.sessions / grandTotal) * 100) : 0
-    const sessionsLabel = item.sessions === 1 ? '1 sesión' : `${item.sessions} sesiones`
-    const row = document.createElement('div')
-    row.className = 'legend-row'
-    row.innerHTML = `
-      <span class="legend-dot" style="background:${color}"></span>
-      <span class="legend-name">${item.label}</span>
-      <span class="legend-pct" style="color:${color};background:${colorBg}">${item.sessions > 0 ? `${pct}%` : '—'}</span>
-      <span class="legend-sessions">${item.sessions > 0 ? sessionsLabel : 'Sin datos'}</span>
-    `
-    legend.appendChild(row)
-  }
+  currentActivities = status.activities
+  updateViewButtons()
+  renderActivityPanel(currentActivities, selectedView)
 
   document.getElementById('next-send-label')!.textContent = formatNextSend(status.nextSendEstimate)
 }
@@ -163,5 +188,16 @@ document.getElementById('btn-uninstall')?.addEventListener('click', () => {
 document.getElementById('btn-close')?.addEventListener('click', () => {
   void window.electronAPI.closeWindow()
 })
+
+for (const id of ['view-last', 'view-week', 'view-total']) {
+  document.getElementById(id)?.addEventListener('click', (event) => {
+    const btn = event.currentTarget as HTMLButtonElement
+    const view = btn.dataset.view as ViewMode | undefined
+    if (!view || selectedView === view) return
+    selectedView = view
+    updateViewButtons()
+    renderActivityPanel(currentActivities, selectedView)
+  })
+}
 
 window.addEventListener('DOMContentLoaded', () => { void loadStatus() })
