@@ -149,10 +149,23 @@ async function loadStatus() {
   renderActivityPanel(currentActivities, selectedView)
 
   document.getElementById('next-send-label')!.textContent = formatNextSend(status.nextSendEstimate)
+
+  lastRefreshedAt = new Date()
+  updateRefreshLabel()
 }
 
 let keyRevealed = false
 let pendingLatestVersion = ''
+let lastRefreshedAt: Date | null = null
+
+function updateRefreshLabel() {
+  const el = document.getElementById('refresh-label')
+  if (!el || !lastRefreshedAt) return
+  const diffSec = Math.floor((Date.now() - lastRefreshedAt.getTime()) / 1000)
+  if (diffSec < 60) el.textContent = 'Actualizado ahora'
+  else if (diffSec < 120) el.textContent = 'Actualizado hace 1 min'
+  else el.textContent = `Actualizado hace ${Math.floor(diffSec / 60)} min`
+}
 
 document.getElementById('btn-show-key')?.addEventListener('click', () => {
   void (async () => {
@@ -200,4 +213,10 @@ for (const id of ['view-last', 'view-week', 'view-total']) {
   })
 }
 
-window.addEventListener('DOMContentLoaded', () => { void loadStatus() })
+window.addEventListener('DOMContentLoaded', () => {
+  void loadStatus()
+  // Auto-refresh every 5 minutes
+  setInterval(() => { void loadStatus() }, 5 * 60 * 1000)
+  // Update "actualizado hace X" label every 30 seconds
+  setInterval(updateRefreshLabel, 30 * 1000)
+})
