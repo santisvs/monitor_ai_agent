@@ -205,6 +205,48 @@ function getEstimatedSessionsSinceSync(
   return Math.max(0, lastTotal - prevTotal)
 }
 
+function countClaudeCodeSessionsSince(since: Date | null): number {
+  if (!since) return 0
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects')
+  if (!fs.existsSync(projectsDir)) return 0
+  let count = 0
+  try {
+    for (const project of fs.readdirSync(projectsDir)) {
+      const projectPath = path.join(projectsDir, project)
+      try {
+        if (!fs.statSync(projectPath).isDirectory()) continue
+        for (const file of fs.readdirSync(projectPath)) {
+          if (!file.endsWith('.jsonl')) continue
+          const mtime = fs.statSync(path.join(projectPath, file)).mtimeMs
+          if (mtime > since.getTime()) count++
+        }
+      } catch { /* skip */ }
+    }
+  } catch { /* skip */ }
+  return count
+}
+
+function countCursorSessionsSince(since: Date | null): number {
+  if (!since) return 0
+  const appData = process.platform === 'darwin'
+    ? path.join(os.homedir(), 'Library', 'Application Support')
+    : process.platform === 'linux'
+      ? path.join(os.homedir(), '.config')
+      : path.join(os.homedir(), 'AppData', 'Roaming')
+  const wsDir = path.join(appData, 'Cursor', 'User', 'workspaceStorage')
+  if (!fs.existsSync(wsDir)) return 0
+  let count = 0
+  try {
+    for (const entry of fs.readdirSync(wsDir)) {
+      const dbPath = path.join(wsDir, entry, 'state.vscdb')
+      if (!fs.existsSync(dbPath)) continue
+      const mtime = fs.statSync(dbPath).mtimeMs
+      if (mtime > since.getTime()) count++
+    }
+  } catch { /* skip */ }
+  return count
+}
+
 function getEstimatedSessionsWeek(
   history: Array<{ sentAt?: string; sessions: Record<string, number>; sessionsWeek?: Record<string, number> }>,
   tool: string,
@@ -447,11 +489,28 @@ function registerIpcHandlers(brand: ReturnType<typeof loadBrandConfig>): void {
           'vscode-copilot': 'VS Code Copilot',
         }
 
+        const syncState = new SyncStateManager(DEFAULT_SYNC_STATE_PATH)
+
         for (const tool of allTools) {
           const lastEntry = history[history.length - 1]
           const currentSessions = lastEntry?.sessions[tool] ?? 0
           const currentSessionsWeek = getEstimatedSessionsWeek(history, tool)
-          const currentSessionsSinceSync = getEstimatedSessionsSinceSync(history, tool)
+
+          // Real-time count since last sync using filesystem
+          const lastSyncedAt = syncState.getLastSyncedAt(tool)
+          let currentSessionsSinceSync: number
+          if (tool === 'claude-code') {
+            currentSessionsSinceSync = lastSyncedAt !== null
+              ? countClaudeCodeSessionsSince(lastSyncedAt)
+              : getEstimatedSessionsSinceSync(history, tool)
+          } else if (tool === 'cursor') {
+            currentSessionsSinceSync = lastSyncedAt !== null
+              ? countCursorSessionsSince(lastSyncedAt)
+              : getEstimatedSessionsSinceSync(history, tool)
+          } else {
+            currentSessionsSinceSync = getEstimatedSessionsSinceSync(history, tool)
+          }
+
           const { level, percentage } = calculateActivityLevel(currentSessions, history, tool)
           activities.push({
             tool,
