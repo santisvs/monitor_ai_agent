@@ -1,0 +1,16 @@
+@font-face {
+  font-family: 'Urbanist';
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Urbanist-Light.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Urbanist';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Urbanist-Medium.woff2') format('woff2');
+}
+
