@@ -127,7 +127,7 @@ function formatNextSend(iso: string | null): string {
 async function loadStatus() {
   const status = await window.electronAPI.getStatus()
 
-  document.getElementById('version-label')!.textContent = `v${status.version}`
+  document.getElementById('version-text')!.textContent = `v${status.version}`
 
   if (status.latestVersion && status.latestVersion !== status.version) {
     pendingLatestVersion = status.latestVersion

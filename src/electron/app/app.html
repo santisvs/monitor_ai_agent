@@ -5,9 +5,23 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
   <title>Jakite Agent</title>
   <style>
+    @font-face {
+      font-family: 'Urbanist';
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+      src: url('./fonts/Urbanist-Light.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Urbanist';
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+      src: url('./fonts/Urbanist-Medium.woff2') format('woff2');
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #f8fafc; color: #0f172a;
       height: 100vh; display: flex; flex-direction: column; overflow: hidden;
       -webkit-user-select: none; user-select: none;
@@ -173,7 +187,15 @@
   <div class="divider"></div>
   <div class="footer">
     <button class="btn-uninstall" id="btn-uninstall">Desinstalar</button>
-    <span class="footer-version" id="version-label">v—</span>
+    <span class="footer-version" id="version-label" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+      <svg width="14" height="14" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
+        <circle cx="13" cy="13" r="13" fill="rgb(37,99,235)"/>
+        <circle cx="35" cy="13" r="13" fill="rgb(37,99,235)"/>
+        <circle cx="13" cy="35" r="13" fill="rgb(37,99,235)"/>
+        <circle cx="35" cy="35" r="13" fill="rgb(37,99,235)"/>
+      </svg>
+      <span id="version-text">v—</span>
+    </span>
     <button class="btn-close" id="btn-close">Cerrar ×</button>
   </div>
 
